@@ -6,12 +6,12 @@ import {
 	AgentConversationLayout,
 	type AgentQuickAction,
 	AgentQuickActions,
-	AgentWelcomeHero,
 } from "@cline/ui";
 import { Cloud } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgendaTaskReviewDialog } from "@/components/agenda-task-review-dialog";
+import { SegraWelcomeHero } from "@/components/segra-logo";
 import { useAccount } from "@/contexts/account-context";
 import { useWorkspace } from "@/contexts/workspace-context";
 import { isAgendaTaskExpired, useAgendaTasks } from "@/hooks/use-agenda-tasks";
@@ -462,7 +462,7 @@ export function WelcomeScreen({
 			welcomeHeader={
 				<div className="cline-view-enter">
 					<h1 className="sr-only">What would you like to build?</h1>
-					<AgentWelcomeHero />
+					<SegraWelcomeHero />
 
 					<div className="mt-11 flex min-w-0 items-center gap-2">
 						{environmentSelector}

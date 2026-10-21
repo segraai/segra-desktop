@@ -1524,11 +1524,26 @@ fn set_tray_status(
     Ok(())
 }
 
+/// Segra Desktop keeps its settings, sessions, and hub state in `~/.segra-desktop`
+/// (unless `CLINE_DIR`/`CLINE_DATA_DIR` say otherwise), so it never shares
+/// accounts or a hub with an installed Cline. The backend and hub inherit it.
+/// Runs before any thread exists, which `set_var` requires.
+fn use_segra_data_dir() {
+    if non_empty_env("CLINE_DIR").is_some() || non_empty_env("CLINE_DATA_DIR").is_some() {
+        return;
+    }
+    let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE"));
+    if let Ok(home) = home {
+        std::env::set_var("CLINE_DIR", PathBuf::from(home).join(".segra-desktop"));
+    }
+}
+
 fn main() {
     // Must stay first: WebKitGTK reads the environment while initializing,
     // and the variable has to be in place before any thread exists.
     #[cfg(target_os = "linux")]
     linux_webview::configure_environment();
+    use_segra_data_dir();
 
     let desktop_backend = Arc::new(DesktopBackendState::default());
     let launch_cwd = std::env::current_dir()
@@ -1546,6 +1561,14 @@ fn main() {
             show_main_window(app);
         }))
         .plugin(tauri_plugin_notification::init())
+        // Never let the webview leave the app for a local file: WebKit opens a
+        // dropped file (e.g. a PDF) as a page when nothing else handles the
+        // drop, and the app has no back button to return from it.
+        .plugin(
+            tauri::plugin::Builder::<tauri::Wry, ()>::new("segra-navigation-guard")
+                .on_navigation(|_webview, url| url.scheme() != "file")
+                .build(),
+        )
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(desktop_backend)
         .manage(Arc::new(UpdateState::default()))

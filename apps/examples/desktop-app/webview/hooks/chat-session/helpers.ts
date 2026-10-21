@@ -284,10 +284,13 @@ export function resolveCredentialFailureHint(
 	if (normalizeProviderId(providerId) === "cline") {
 		return "Sign in to Cline again in Settings → Account, then try again.";
 	}
+	if (normalizeProviderId(providerId) === "segra") {
+		return "Sign in to Segra again in Settings → Providers → Segra, then try again.";
+	}
 	if (!providerAuth) {
 		return "Sign in again using your provider's authentication method, then try again.";
 	}
-	return "Check your model connection in Settings → Providers (or sign in with Cline), then try again.";
+	return "Check your model connection in Settings → Providers (or sign in with Segra), then try again.";
 }
 
 /**
@@ -315,6 +318,9 @@ export function resolveCredentialFailureAction(
 ): { label: string; target: "account" | "models" } | null {
 	if (normalizeProviderId(providerId) === "cline") {
 		return { label: "Sign in to Cline", target: "account" };
+	}
+	if (normalizeProviderId(providerId) === "segra") {
+		return { label: "Sign in to Segra", target: "models" };
 	}
 	const providerAuth = matchingProviderAuth(providerId, auth);
 	if (!providerAuth || providerAuth.localCli) {

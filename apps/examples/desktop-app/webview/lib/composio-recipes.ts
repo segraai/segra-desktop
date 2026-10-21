@@ -18,7 +18,7 @@ export const COMPOSIO_RECIPES: ComposioRecipe[] = [
 		id: "organize-your-day",
 		title: "Organize your day",
 		description:
-			"Start with a morning brief: Cline reads overnight email and Slack threads, lays out today's calendar, drafts the replies that need you, and flags what to prep before each meeting.",
+			"Start with a morning brief: Segra Desktop reads overnight email and Slack threads, lays out today's calendar, drafts the replies that need you, and flags what to prep before each meeting.",
 		prompt:
 			"Give me a morning brief: what came in overnight, what's on my calendar today, and draft replies to anything urgent.",
 		connectors: [
@@ -31,7 +31,7 @@ export const COMPOSIO_RECIPES: ComposioRecipe[] = [
 		id: "incident-rca",
 		title: "Debug production incidents",
 		description:
-			"An obscure high-memory report lands in Slack. Cline pulls the thread, correlates it with the matching Sentry errors and related Linear issues, and writes up a root-cause analysis with a fix plan.",
+			"An obscure high-memory report lands in Slack. Segra Desktop pulls the thread, correlates it with the matching Sentry errors and related Linear issues, and writes up a root-cause analysis with a fix plan.",
 		prompt:
 			"Investigate the memory spike reported in #eng-alerts this morning and give me an RCA.",
 		connectors: [
@@ -44,7 +44,7 @@ export const COMPOSIO_RECIPES: ComposioRecipe[] = [
 		id: "spec-to-shipped",
 		title: "Run product from your desktop",
 		description:
-			"Turn a Notion spec into scoped Linear issues, keep them updated as work lands, and post the weekly status to Slack without leaving Cline.",
+			"Turn a Notion spec into scoped Linear issues, keep them updated as work lands, and post the weekly status to Slack without leaving Segra Desktop.",
 		prompt:
 			"Break the checkout redesign spec in Notion into Linear issues and post a summary to #product.",
 		connectors: [
@@ -57,7 +57,7 @@ export const COMPOSIO_RECIPES: ComposioRecipe[] = [
 		id: "launch-and-market",
 		title: "Launch and market what you build",
 		description:
-			"Ship a side project, then have Cline generate the teaser images and video, upload it to YouTube, and write the LinkedIn and Reddit launch posts.",
+			"Ship a side project, then have Segra Desktop generate the teaser images and video, upload it to YouTube, and write the LinkedIn and Reddit launch posts.",
 		prompt:
 			"Make a 30-second teaser for this project, upload it to YouTube, and draft launch posts for LinkedIn and r/SideProject.",
 		connectors: [

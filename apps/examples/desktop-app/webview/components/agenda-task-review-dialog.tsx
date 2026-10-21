@@ -74,7 +74,7 @@ export function AgendaTaskReviewDialog({
 									value={
 										task.modelSelection
 											? `${task.modelSelection.providerId}/${task.modelSelection.modelId ?? "default"}`
-											: "Cline default"
+											: "Segra Desktop default"
 									}
 								/>
 								{task.cwd ? (

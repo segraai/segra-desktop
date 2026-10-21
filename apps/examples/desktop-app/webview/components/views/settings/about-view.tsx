@@ -61,16 +61,16 @@ function UpdateRow() {
 		checking || status.state === "checking" || status.state === "downloading";
 	const description =
 		status.state === "ready"
-			? `Version ${status.version} is downloaded and will be used the next time Cline starts.`
+			? `Version ${status.version} is downloaded and will be used the next time Segra Desktop starts.`
 			: status.state === "downloading"
 				? `Downloading version ${status.version ?? ""}…`
 				: status.state === "error" && status.error
 					? `The last check failed: ${status.error}`
 					: checkResult === "up-to-date"
-						? "You're up to date. Cline also checks on its own shortly after launch and every two hours."
+						? "You're up to date. Segra Desktop also checks on its own shortly after launch and every two hours."
 						: checkResult === "unavailable"
 							? "Update checks are only available in the desktop app."
-							: "Cline checks for updates shortly after launch and every two hours, and installs them when it restarts.";
+							: "Segra Desktop checks for updates shortly after launch and every two hours, and installs them when it restarts.";
 
 	return (
 		<div className="flex items-center justify-between gap-5 border-b py-4 max-[720px]:flex-col max-[720px]:items-stretch">
@@ -170,6 +170,60 @@ function ReleaseNotes({
 	);
 }
 
+const SEGRA_SUPPORT_URL = "https://segra.ai";
+const CLINE_REPO_URL = "https://github.com/cline/cline";
+
+/**
+ * Apache-2.0 attribution for the Cline codebase Segra Desktop is built on. The
+ * license text ships in public/licenses so it is available offline.
+ */
+function OpenSourceNotice() {
+	const [license, setLicense] = useState<string | null>(null);
+	const [open, setOpen] = useState(false);
+
+	useEffect(() => {
+		if (!open || license !== null) return;
+		fetch("/licenses/cline-LICENSE.txt")
+			.then((response) => response.text())
+			.then(setLicense)
+			.catch(() => setLicense("The license text could not be loaded."));
+	}, [open, license]);
+
+	return (
+		<div className="pt-6">
+			<h2 className="text-lg font-semibold text-foreground">Open source</h2>
+			<p className="mt-2 text-sm text-muted-foreground">
+				Segra Desktop is based on{" "}
+				<button
+					className="underline underline-offset-2 hover:text-foreground"
+					onClick={() => void openExternalUrl(CLINE_REPO_URL)}
+					type="button"
+				>
+					Cline
+				</button>
+				, Copyright 2026 Cline Bot Inc., licensed under the Apache License,
+				Version 2.0. Segra has modified it, including the Segra provider,
+				sign-in, web search, and branding. Cline is a trademark of Cline Bot
+				Inc.; Segra Desktop is not affiliated with or endorsed by Cline.
+			</p>
+			<Button
+				className="mt-3 -ml-2 text-muted-foreground"
+				onClick={() => setOpen((value) => !value)}
+				size="sm"
+				type="button"
+				variant="ghost"
+			>
+				{open ? "Hide license" : "View license"}
+			</Button>
+			{open ? (
+				<pre className="mt-2 max-h-96 overflow-auto rounded-md border bg-muted/40 p-3 font-mono text-xs whitespace-pre-wrap text-muted-foreground">
+					{license ?? "Loading…"}
+				</pre>
+			) : null}
+		</div>
+	);
+}
+
 export function AboutContent({
 	onOpenConnectors,
 }: {
@@ -250,46 +304,23 @@ export function AboutContent({
 				) : null}
 				<div className="flex items-center justify-between gap-5 border-b py-4 max-[720px]:flex-col max-[720px]:items-stretch">
 					<div className="flex flex-col gap-1">
-						<p className="text-base font-semibold text-foreground">
-							Report an issue
-						</p>
+						<p className="text-base font-semibold text-foreground">Get help</p>
 						<p className="text-sm text-muted-foreground">
-							Found a bug or have a request? Open an issue on GitHub.
+							Found a bug or have a request? Contact Segra.
 						</p>
 					</div>
 					<Button
 						className="shrink-0"
-						onClick={() => void openExternalUrl(ISSUES_URL)}
+						onClick={() => void openExternalUrl(SEGRA_SUPPORT_URL)}
 						size="sm"
 						type="button"
 						variant="outline"
 					>
 						<Bug className="size-3" />
-						Open GitHub issues
+						Visit segra.ai
 					</Button>
 				</div>
-				<div className="pt-6">
-					<div className="flex items-center justify-between gap-4">
-						<h2 className="text-lg font-semibold text-foreground">
-							Release notes
-						</h2>
-						<Button
-							className="text-muted-foreground"
-							onClick={() => void openExternalUrl(CHANGELOG_URL_ON_GITHUB)}
-							size="sm"
-							type="button"
-							variant="ghost"
-						>
-							Full changelog
-							<ExternalLink className="size-3" />
-						</Button>
-					</div>
-					<ReleaseNotes
-						appVersion={appVersion}
-						error={changelogError}
-						releases={releases}
-					/>
-				</div>
+				<OpenSourceNotice />
 			</section>
 		</PageFrame>
 	);

@@ -68,7 +68,8 @@ const TYPE_META: Record<MarketplaceTypeFilter, MarketplaceTypeMeta> = {
 		plural: "Skills",
 		short: "Skill",
 		icon: Zap,
-		blurb: "Step-by-step instructions Cline follows for a workflow. No setup.",
+		blurb:
+			"Step-by-step instructions Segra Desktop follows for a workflow. No setup.",
 		text: "text-amber-600 dark:text-amber-300",
 		bg: "bg-amber-500/12",
 	},
@@ -86,7 +87,7 @@ const TYPE_META: Record<MarketplaceTypeFilter, MarketplaceTypeMeta> = {
 		plural: "Plugins",
 		short: "Plugin",
 		icon: Puzzle,
-		blurb: "A bundle of tools, hooks, and skills built for Cline.",
+		blurb: "A bundle of tools, hooks, and skills built for Segra Desktop.",
 		text: "text-violet-600 dark:text-violet-300",
 		bg: "bg-violet-500/12",
 	},

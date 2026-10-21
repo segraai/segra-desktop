@@ -330,7 +330,7 @@ export async function uninstallMarketplaceSkill(
 	const removedPaths = removeRemainingMarketplaceSkillPaths(entry);
 	if (isMarketplaceSkillInstalled(entry)) {
 		throw new Error(
-			`Skill uninstall completed, but ${entry.name ?? entry.id} is still present in Cline's global skills directories.`,
+			`Skill uninstall completed, but ${entry.name ?? entry.id} is still present in the global skills directories.`,
 		);
 	}
 	return {

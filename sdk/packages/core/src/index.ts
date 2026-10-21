@@ -183,6 +183,14 @@ export {
 	resolveProviderApiKeyFromSettings,
 	saveProviderOAuthCredentials,
 } from "./auth/provider-auth-registry";
+export {
+	completeSegraDeviceAuth,
+	loginSegra,
+	refreshSegraCredentials,
+	resolveSegraBaseUrl,
+	type SegraDeviceAuthorization,
+	startSegraDeviceAuth,
+} from "./auth/segra";
 export type {
 	LocalOAuthServer,
 	LocalOAuthServerOptions,

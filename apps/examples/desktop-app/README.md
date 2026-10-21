@@ -238,7 +238,7 @@ sudo dnf install ./Cline_<version>_x86_64.rpm    # Fedora / RHEL (x86_64)
 sudo dnf install ./Cline_<version>_aarch64.rpm   # Fedora / RHEL (arm64)
 ```
 
-The app installs as `/usr/bin/cline-app` with a `Cline` launcher entry; the
+The app installs as `/usr/bin/segra-desktop` with a `Segra Desktop` launcher entry; the
 bundled Cline CLI is `/usr/bin/cline-cli`, and the desktop backend bundle and
 SSH remote CLIs live in `/usr/lib/Cline/`. The tray icon needs a StatusNotifier host (KDE, XFCE, and
 GNOME with the AppIndicator extension); without one the app still runs but the
@@ -381,7 +381,7 @@ credentials, request headers, recorded audio, or transcript contents.
   This also matches hybrid-GPU systems where another GPU renders, which then
   lose the faster DMA-BUF path (not hardware acceleration as a whole). To opt
   out, fully Quit from the tray (closing the window only hides it) and launch
-  with `WEBKIT_DISABLE_DMABUF_RENDERER=0 cline-app`; any value you set is
+  with `WEBKIT_DISABLE_DMABUF_RENDERER=0 segra-desktop`; any value you set is
   left untouched.
 - If package changes are not reflected, rebuild SDK packages (`bun run build:sdk`).
   The next desktop or CLI Hub connection will reuse a compatible running Hub or

@@ -9,6 +9,7 @@ import type { Provider } from "@/lib/provider-schema";
  * entries whose capability metadata is incomplete.
  */
 export const OAUTH_PROVIDER_IDS = new Set([
+	"segra",
 	"cline",
 	// ClinePass shares the Cline account OAuth credentials (its auth handler
 	// stores under the "cline" provider), so it never has its own API key.
@@ -31,26 +32,30 @@ export type ProviderAuthKind = "oauth" | "local" | "api-key";
 export const OAUTH_LOGIN_TIMEOUT_MS = 15 * 60_000;
 
 // Cancellation targets the provider, so it must finish before another screen signs in.
-let pendingClineCancellation: Promise<unknown> | null = null;
+const pendingCancellations = new Map<string, Promise<unknown>>();
+
+export function cancelProviderOAuthLogin(provider: string): Promise<unknown> {
+	let pending = pendingCancellations.get(provider);
+	if (!pending) {
+		pending = desktopClient
+			.invoke("cancel_provider_oauth_login", { provider })
+			.finally(() => {
+				pendingCancellations.delete(provider);
+			});
+		pendingCancellations.set(provider, pending);
+	}
+	return pending;
+}
 
 export function cancelClineOAuthLogin(): Promise<unknown> {
-	if (!pendingClineCancellation) {
-		pendingClineCancellation = desktopClient
-			.invoke("cancel_provider_oauth_login", { provider: "cline" })
-			.finally(() => {
-				pendingClineCancellation = null;
-			});
-	}
-	return pendingClineCancellation;
+	return cancelProviderOAuthLogin("cline");
 }
 
 export async function runProviderOAuthLogin(
 	provider: string,
 	signal?: AbortSignal,
 ): Promise<{ provider: string; accessToken: string }> {
-	if (provider === "cline" && pendingClineCancellation) {
-		await pendingClineCancellation.catch(() => undefined);
-	}
+	await pendingCancellations.get(provider)?.catch(() => undefined);
 	return desktopClient.invoke(
 		"run_provider_oauth_login",
 		{ provider },

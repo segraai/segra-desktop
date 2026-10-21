@@ -147,6 +147,10 @@ export {
 	type ClineWebSearchResult,
 	createCline,
 } from "./providers/vendors/cline";
+export {
+	SEGRA_DEFAULT_BASE_URL,
+	SEGRA_PROVIDER_ID,
+} from "./providers/vendors/segra";
 export { LangfuseAttributesSpanProcessor } from "./services/LangfuseAttributesSpanProcessor";
 export {
 	disposeLangfuseTelemetry,

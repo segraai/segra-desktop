@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AppStream metadata for the .deb/.rpm packages. Software centers (GNOME
+  Software, KDE Discover) read this from /usr/share/metainfo to show the app's
+  icon and description.
+
+  The launchable must match the .desktop file tauri-bundler generates, which is
+  named after productName. Each channel installs side by side, so each ships its
+  own copy of this file under linux/metainfo/<channel>/.
+-->
+<component type="desktop-application">
+	<id>ai.segra.desktop.beta</id>
+	<launchable type="desktop-id">Segra Desktop Beta.desktop</launchable>
+	<name>Segra Desktop Beta</name>
+	<summary>Private AI coding agent</summary>
+	<developer id="ai.segra">
+		<name>Segra</name>
+	</developer>
+	<metadata_license>CC0-1.0</metadata_license>
+	<project_license>Apache-2.0</project_license>
+	<description>
+		<p>Segra Desktop is a private AI coding agent. It reads your code, edits files, runs commands, and works through tasks with you, using models that run in sealed hardware (TEEs) so your code stays private.</p>
+		<p>Based on Cline (https://github.com/cline/cline), licensed under the Apache License 2.0.</p>
+	</description>
+	<url type="homepage">https://segra.ai</url>
+	<content_rating type="oars-1.1" />
+</component>

@@ -175,7 +175,7 @@ export function HubUpdateRequiredDialog() {
 			setUpdateHint(
 				error instanceof Error && error.message
 					? error.message
-					: "Updating the Cline Hub failed. Try again, or run 'cline doctor fix' in a terminal.",
+					: "Updating the Segra Desktop background service failed. Try again, or restart Segra Desktop.",
 			);
 			setPhase("idle");
 			return;
@@ -210,15 +210,17 @@ export function HubUpdateRequiredDialog() {
 			<AlertDialog open>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Cline Hub update required</AlertDialogTitle>
+						<AlertDialogTitle>
+							Background service update required
+						</AlertDialogTitle>
 						<AlertDialogDescription>
-							Cline needs a newer Cline Hub, but the running one is still
-							serving {describeOutdatedHubSessions(mismatch)}.
+							Segra Desktop needs a newer background service, but the running
+							one is still serving {describeOutdatedHubSessions(mismatch)}.
 						</AlertDialogDescription>
 						<AlertDialogDescription>
-							Update Now stops that Hub and interrupts its sessions. Quit Cline
-							closes this app and leaves the Hub running, so you can update
-							later.
+							Update Now stops that service and interrupts its sessions. Quit
+							Segra Desktop closes this app and leaves the service running, so
+							you can update later.
 						</AlertDialogDescription>
 						{updateHint ? (
 							<AlertDialogDescription>{updateHint}</AlertDialogDescription>
@@ -232,7 +234,7 @@ export function HubUpdateRequiredDialog() {
 								void handleQuit();
 							}}
 						>
-							Quit Cline
+							Quit Segra Desktop
 						</AlertDialogCancel>
 						<AlertDialogAction
 							disabled={phase !== "idle"}
@@ -277,14 +279,15 @@ export function HubUpdateRequiredDialog() {
 		>
 			<AlertDialogContent>
 				<AlertDialogHeader>
-					<AlertDialogTitle>Cline Hub was updated</AlertDialogTitle>
+					<AlertDialogTitle>Background service was updated</AlertDialogTitle>
 					<AlertDialogDescription>
-						Another Cline installation updated the shared Cline Hub
+						Another Segra Desktop installation updated the shared background
+						service
 						{mismatch?.hubCoreVersion
 							? ` (core ${mismatch.hubCoreVersion})`
 							: ""}
-						, and it no longer matches this app. Update and restart Cline to
-						stay in sync with the running Hub.
+						, and it no longer matches this app. Update and restart Segra
+						Desktop to stay in sync with the running service.
 					</AlertDialogDescription>
 					{updateHint ? (
 						<AlertDialogDescription>{updateHint}</AlertDialogDescription>

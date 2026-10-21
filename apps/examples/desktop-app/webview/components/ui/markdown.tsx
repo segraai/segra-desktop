@@ -64,7 +64,7 @@ export function MarkdownLinkSafetyModal({
 				<AlertDialogHeader>
 					<AlertDialogTitle>Open external link?</AlertDialogTitle>
 					<AlertDialogDescription>
-						You are about to leave Cline and visit this address.
+						You are about to leave Segra Desktop and visit this address.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<div className="max-h-32 overflow-y-auto wrap-break-word rounded-md bg-muted p-3 font-mono text-sm">

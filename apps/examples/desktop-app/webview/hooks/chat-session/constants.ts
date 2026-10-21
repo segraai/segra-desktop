@@ -20,6 +20,8 @@ export const CHAT_WS_RECONNECT_MAX_DELAY_MS = 3000;
 export const CHAT_WS_REQUEST_TIMEOUT_MS = 120000;
 export { OAUTH_PROVIDER_IDS as OAUTH_MANAGED_PROVIDERS } from "@/lib/provider-connection";
 
+export const SEGRA_DEFAULT_MODEL_ID = "0GM-1.0-35B-A3B";
+
 export const DEFAULT_CHAT_CONFIG: ChatSessionConfig = {
 	sessionId: undefined,
 	executionTarget: "local",
@@ -27,9 +29,11 @@ export const DEFAULT_CHAT_CONFIG: ChatSessionConfig = {
 	workspaceRoot: "",
 	cwd: "",
 	environmentId: LOCAL_WORKSPACE_ENVIRONMENT_ID,
-	provider: "cline",
-	model: CLINE_DEFAULT_MODEL_ID,
-	apiKey: process.env.CLINE_API_KEY || "",
+	// Segra Desktop: new installs start on Segra's default model. If Segra stops
+	// listing it, the composer switches to the first model it does list.
+	provider: "segra",
+	model: SEGRA_DEFAULT_MODEL_ID,
+	apiKey: "",
 	mode: "act",
 	systemPrompt: undefined,
 	maxIterations: undefined,

@@ -4,6 +4,7 @@ import {
 	existsSync,
 	mkdirSync,
 	readdirSync,
+	readFileSync,
 	realpathSync,
 	rmSync,
 	statSync,
@@ -192,6 +193,9 @@ import type {
 } from "./types";
 import { LOCAL_ENVIRONMENT_ID } from "./types";
 import { pickWorkspaceDirectory } from "./workspace-picker";
+
+// Upstream Cline account providers, hidden from Segra Desktop's provider list.
+const SEGRA_HIDDEN_PROVIDER_IDS = new Set(["cline", "cline-pass"]);
 
 // All child processes in this module run asynchronously: the sidecar is a
 // single event loop shared by every UI command and streaming chat session, so
@@ -2886,7 +2890,16 @@ export async function handleCommand(
 	if (command === "list_provider_catalog") {
 		const manager = new ProviderSettingsManager();
 		await ensureCustomProvidersLoaded(manager);
-		return await listLocalProviders(manager, { isClinePassEnabled: true });
+		const catalog = await listLocalProviders(manager, {
+			isClinePassEnabled: true,
+		});
+		// Segra Desktop: the upstream Cline account gateways aren't offered.
+		return {
+			...catalog,
+			providers: catalog.providers.filter(
+				(provider) => !SEGRA_HIDDEN_PROVIDER_IDS.has(provider.id),
+			),
+		};
 	}
 	if (command === "list_transcription_models") {
 		const manager = new ProviderSettingsManager();
@@ -3687,6 +3700,26 @@ export async function handleCommand(
 	}
 	if (command === "list_available_editors") {
 		return await listAvailableCodeEditors();
+	}
+	// Files dropped on the window arrive from the Tauri shell as paths (the
+	// webview can't read local files), so read them here for attachment.
+	if (command === "read_dropped_file") {
+		const filePath = String(args?.path ?? "").trim();
+		if (!filePath || !isAbsolute(filePath)) {
+			throw new Error("an absolute path is required");
+		}
+		const stat = statSync(filePath);
+		if (!stat.isFile()) throw new Error(`Not a file: ${filePath}`);
+		const maxBytes = 25 * 1024 * 1024;
+		if (stat.size > maxBytes) {
+			throw new Error(
+				`${basename(filePath)} is too large to attach (over 25 MB).`,
+			);
+		}
+		return {
+			name: basename(filePath),
+			base64: readFileSync(filePath).toString("base64"),
+		};
 	}
 	if (command === "open_file_in_editor") {
 		if (getCommandRuntimeBinding(ctx, args).kind === "ssh") {

@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import {
-	cancelClineOAuthLogin,
+	cancelProviderOAuthLogin,
 	runProviderOAuthLogin,
 } from "@/lib/provider-connection";
 
 export function useClineSignIn({
+	provider = "cline",
 	onSuccess,
 	onSettled,
 }: {
+	/** Device sign-in provider: "cline" (default) or "segra". */
+	provider?: string;
 	onSuccess: (signal: AbortSignal) => Promise<void>;
 	onSettled?: () => void;
 }) {
@@ -25,7 +28,7 @@ export function useClineSignIn({
 		setPending(true);
 		setError(null);
 		try {
-			await runProviderOAuthLogin("cline", attempt.signal);
+			await runProviderOAuthLogin(provider, attempt.signal);
 			await onSuccess(attempt.signal);
 		} catch (error) {
 			if (!attempt.signal.aborted) {
@@ -44,7 +47,7 @@ export function useClineSignIn({
 		setCancelling(true);
 		setError(null);
 		try {
-			await cancelClineOAuthLogin();
+			await cancelProviderOAuthLogin(provider);
 		} catch (error) {
 			setError(
 				`Could not cancel sign-in: ${error instanceof Error ? error.message : String(error)}`,

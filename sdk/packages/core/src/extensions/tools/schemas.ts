@@ -189,6 +189,19 @@ export const FetchWebContentInputSchema = z.object({
 });
 
 /**
+ * Schema for search_web tool input
+ */
+export const SearchWebInputSchema = z.object({
+	queries: z
+		.array(z.string().min(2))
+		.min(1)
+		.max(3)
+		.describe(
+			"1-3 short keyword queries, like a person types into a search engine",
+		),
+});
+
+/**
  * Schema for editor tool input
  */
 export const EditFileInputSchema = z
@@ -323,6 +336,7 @@ export type StructuredCommandInput = z.infer<
 /**
  * Web fetch request parameters
  */
+export type SearchWebInput = z.infer<typeof SearchWebInputSchema>;
 export type WebFetchRequest = z.infer<typeof WebFetchRequestSchema>;
 
 /**

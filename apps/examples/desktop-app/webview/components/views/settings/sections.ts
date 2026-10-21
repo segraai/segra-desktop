@@ -39,7 +39,11 @@ export type SettingsSection =
 
 // Temporarily hidden from the sidebar. The views and routes still exist —
 // remove a section from this set to surface it again.
-const HIDDEN_SECTIONS: ReadonlySet<SettingsSection> = new Set(["Channels"]);
+// Segra Desktop: "Account" is the upstream Cline account, which Segra doesn't use.
+const HIDDEN_SECTIONS: ReadonlySet<SettingsSection> = new Set([
+	"Channels",
+	"Account",
+]);
 
 export const SETTINGS_SECTIONS = ALL_SETTINGS_SECTIONS.filter(
 	(section) => !HIDDEN_SECTIONS.has(section),

@@ -1,11 +1,13 @@
 import type { ProviderSettingsManager } from "@cline/core";
 import {
 	completeClineDeviceAuth,
+	completeSegraDeviceAuth,
 	getProviderAuthStorageId,
 	loginLocalProvider,
 	markLocalProviderEnabled,
 	saveLocalProviderOAuthCredentials,
 	startClineDeviceAuth,
+	startSegraDeviceAuth,
 } from "@cline/core";
 import { getClineEnvironmentConfig } from "@cline/shared";
 
@@ -47,6 +49,24 @@ async function loginProviderForDesktop(
 	onUserCode?: (userCode: string) => void,
 	signal?: AbortSignal,
 ): ReturnType<typeof loginLocalProvider> {
+	if (providerId === "segra") {
+		// Segra uses the same device flow shape: show the code, open the
+		// approval page, and poll until the signed-in user approves.
+		const device = await startSegraDeviceAuth({
+			baseUrl: existing?.baseUrl,
+			signal,
+		});
+		signal?.throwIfAborted();
+		onUserCode?.(device.userCode);
+		openUrl(device.verificationUriComplete ?? device.verificationUri);
+		return completeSegraDeviceAuth({
+			baseUrl: existing?.baseUrl,
+			deviceCode: device.deviceCode,
+			expiresInSeconds: device.expiresInSeconds,
+			pollIntervalSeconds: device.pollIntervalSeconds,
+			signal,
+		});
+	}
 	if (providerId !== "cline" && providerId !== "cline-pass") {
 		return loginLocalProvider(providerId, existing, openUrl);
 	}

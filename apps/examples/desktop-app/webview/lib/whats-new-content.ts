@@ -42,10 +42,14 @@ export type WhatsNewRelease =
 	| { id: string; title: string; highlights: WhatsNewHighlight[] }
 	| { id: string; title: string; spotlight: "connectors" };
 
-export const WHATS_NEW_RELEASES: WhatsNewRelease[] = [
+// Segra Desktop release notes, newest first. The upstream Cline notes describe
+// Cline's account features, so they are kept below for reference only.
+export const WHATS_NEW_RELEASES: WhatsNewRelease[] = [];
+
+export const UPSTREAM_CLINE_WHATS_NEW_RELEASES: WhatsNewRelease[] = [
 	{
 		id: "2026-10-connectors",
-		title: "Connect Cline to your apps",
+		title: "Connect Segra Desktop to your apps",
 		spotlight: "connectors",
 	},
 	{
@@ -55,7 +59,7 @@ export const WHATS_NEW_RELEASES: WhatsNewRelease[] = [
 			{
 				title: "SSH remotes",
 				description:
-					"The app stays on your laptop while Cline works on any machine you can SSH into.",
+					"The app stays on your laptop while Segra Desktop works on any machine you can SSH into.",
 				icon: Network,
 			},
 			{

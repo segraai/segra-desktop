@@ -52,6 +52,8 @@ import {
 	type SearchCodebaseInput,
 	SearchCodebaseInputSchema,
 	SearchCodebaseUnionInputSchema,
+	type SearchWebInput,
+	SearchWebInputSchema,
 	type SkillsInput,
 	SkillsInputSchema,
 	type StructuredCommandInput,
@@ -71,6 +73,7 @@ import type {
 	ToolOperationResult,
 	VerifySubmitExecutor,
 	WebFetchExecutor,
+	WebSearchExecutor,
 } from "./types";
 
 // =============================================================================
@@ -616,6 +619,54 @@ export function createWebFetchTool(
 	});
 }
 
+/**
+ * Create the search_web tool
+ *
+ * Runs keyword searches from this machine; pairs with fetch_web_content for details.
+ */
+export function createWebSearchTool(
+	executor: WebSearchExecutor,
+	config: Pick<DefaultToolsConfig, "webFetchTimeoutMs"> = {},
+): AgentTool<SearchWebInput, ToolOperationResult[]> {
+	const timeoutMs = config.webFetchTimeoutMs ?? 30000;
+
+	return createTool<SearchWebInput, ToolOperationResult[]>({
+		name: "search_web",
+		description:
+			"Search the web privately from the user's computer. Use it for anything current or outside your knowledge: news, scores, weather, prices, releases, error messages, library docs. " +
+			"Write short keyword queries the way a person types into a search engine (about 2-6 words): key names, versions, places, and dates, with no full sentences or filler. " +
+			"Returns titles, URLs and snippets. Snippets are often enough for quick facts; otherwise call fetch_web_content on the most relevant URLs. Run up to 3 different queries together in one call when useful.",
+		inputSchema: zodToJsonSchema(SearchWebInputSchema),
+		timeoutMs: timeoutMs * 2,
+		retryable: true,
+		maxRetries: 1,
+		execute: async (input, context) => {
+			const validatedInput = validateWithZod(SearchWebInputSchema, input);
+			return Promise.all(
+				validatedInput.queries.map(
+					async (query): Promise<ToolOperationResult> => {
+						try {
+							const result = await withTimeout(
+								executor(query, context),
+								timeoutMs,
+								`Web search timed out after ${timeoutMs}ms`,
+							);
+							return { query, result, success: true };
+						} catch (error) {
+							return {
+								query,
+								result: "",
+								error: `Error searching the web: ${formatError(error)}`,
+								success: false,
+							};
+						}
+					},
+				),
+			);
+		},
+	});
+}
+
 const APPLY_PATCH_TOOL_DESC = `Use \`apply_patch\` to edit files with the canonical freeform patch grammar. Pass the patch text directly as the \`input\` string. Prefer the exact format below:
 
 *** Begin Patch
@@ -962,6 +1013,11 @@ export function createDefaultTools(
 	// Add fetch_web_content tool if enabled and executor provided
 	if (enableWebFetch && executors.webFetch) {
 		tools.push(createWebFetchTool(executors.webFetch, config));
+	}
+
+	// search_web shares the web fetch switch: search finds URLs, fetch reads them.
+	if (enableWebFetch && executors.webSearch) {
+		tools.push(createWebSearchTool(executors.webSearch, config));
 	}
 
 	// Add editor tool if enabled and executor provided,

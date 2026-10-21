@@ -92,7 +92,7 @@ const primitivePageDetails = {
 	},
 	skill: {
 		title: "Skills",
-		description: "Install skills globally for Cline.",
+		description: "Install skills globally for Segra Desktop.",
 		emptyInstalled: "No skills installed. Browse the marketplace to add one.",
 		emptyCatalog: "No skills match the current filters.",
 		icon: Zap,
@@ -109,7 +109,7 @@ const primitivePageDetails = {
 const directoryPageDetails: MarketplacePageDetails = {
 	title: "Marketplace",
 	description:
-		"A curated set of plugins, MCP servers, and skills from the Cline community.",
+		"A curated set of plugins, MCP servers, and skills from the community.",
 	emptyInstalled: "Nothing installed yet.",
 	emptyCatalog: "No marketplace entries match the current filters.",
 	icon: Store,
@@ -223,7 +223,7 @@ function EntrySetupGuidance({ entry }: { entry: MarketplaceEntry }) {
 						Environment setup needed
 					</p>
 					<p className="mt-1 text-xs leading-5 text-amber-800/80 dark:text-amber-100/80">
-						Add these values to your Cline/plugin environment after install.
+						Add these values to your plugin environment after install.
 					</p>
 					<div className="mt-3 grid gap-2">
 						{[...requiredEnv, ...optionalEnv].map((env) => (

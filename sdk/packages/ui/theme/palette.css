@@ -1,7 +1,7 @@
 /*
  * Cline-owned palette values copied from Radix Colors 3.0.0.
  *
- * Source mapping: Slate → neutral, Violet → accent, Ruby → error,
+ * Source mapping: Slate → neutral, Cyan → accent (Segra Desktop; upstream uses Violet), Ruby → error,
  * Green → success, Amber → warning, and Sky → info.
  * This file intentionally includes the sRGB solid and alpha scales only.
  */
@@ -36,32 +36,32 @@
 	--neutral-a12: #000509e3;
 
 	/* Accent */
-	--accent-1: #fdfcfe;
-	--accent-2: #faf8ff;
-	--accent-3: #f4f0fe;
-	--accent-4: #ebe4ff;
-	--accent-5: #e1d9ff;
-	--accent-6: #d4cafe;
-	--accent-7: #c2b5f5;
-	--accent-8: #aa99ec;
-	--accent-9: #6e56cf;
-	--accent-10: #654dc4;
-	--accent-11: #6550b9;
-	--accent-12: #2f265f;
+	--accent-1: #fafdfe;
+	--accent-2: #f2fafb;
+	--accent-3: #def7f9;
+	--accent-4: #caf1f6;
+	--accent-5: #b5e9f0;
+	--accent-6: #9ddde7;
+	--accent-7: #7dcedc;
+	--accent-8: #3db9cf;
+	--accent-9: #00a2c7;
+	--accent-10: #0797b9;
+	--accent-11: #107d98;
+	--accent-12: #0d3c48;
 
 	/* Accent alpha */
-	--accent-a1: #5500aa03;
-	--accent-a2: #4900ff07;
-	--accent-a3: #4400ee0f;
-	--accent-a4: #4300ff1b;
-	--accent-a5: #3600ff26;
-	--accent-a6: #3100fb35;
-	--accent-a7: #2d01dd4a;
-	--accent-a8: #2b00d066;
-	--accent-a9: #2400b7a9;
-	--accent-a10: #2300abb2;
-	--accent-a11: #1f0099af;
-	--accent-a12: #0b0043d9;
+	--accent-a1: #0099cc05;
+	--accent-a2: #009db10d;
+	--accent-a3: #00c2d121;
+	--accent-a4: #00bcd435;
+	--accent-a5: #01b4cc4a;
+	--accent-a6: #00a7c162;
+	--accent-a7: #009fbb82;
+	--accent-a8: #00a3c0c2;
+	--accent-a9: #00a2c7;
+	--accent-a10: #0094b7f8;
+	--accent-a11: #007491ef;
+	--accent-a12: #00323ef2;
 
 	/* Error */
 	--error-1: #fffcfd;
@@ -206,32 +206,32 @@
 	--neutral-a12: #fcfdffef;
 
 	/* Accent */
-	--accent-1: #14121f;
-	--accent-2: #1b1525;
-	--accent-3: #291f43;
-	--accent-4: #33255b;
-	--accent-5: #3c2e69;
-	--accent-6: #473876;
-	--accent-7: #56468b;
-	--accent-8: #6958ad;
-	--accent-9: #6e56cf;
-	--accent-10: #7d66d9;
-	--accent-11: #baa7ff;
-	--accent-12: #e2ddfe;
+	--accent-1: #0b161a;
+	--accent-2: #101b20;
+	--accent-3: #082c36;
+	--accent-4: #003848;
+	--accent-5: #004558;
+	--accent-6: #045468;
+	--accent-7: #12677e;
+	--accent-8: #11809c;
+	--accent-9: #00a2c7;
+	--accent-10: #23afd0;
+	--accent-11: #4ccce6;
+	--accent-12: #b6ecf7;
 
 	/* Accent alpha */
-	--accent-a1: #4422ff0f;
-	--accent-a2: #853ff916;
-	--accent-a3: #8354fe36;
-	--accent-a4: #7d51fd50;
-	--accent-a5: #845ffd5f;
-	--accent-a6: #8f6cfd6d;
-	--accent-a7: #9879ff83;
-	--accent-a8: #977dfea8;
-	--accent-a9: #8668ffcc;
-	--accent-a10: #9176fed7;
-	--accent-a11: #baa7ff;
-	--accent-a12: #e3defffe;
+	--accent-a1: #0091f70a;
+	--accent-a2: #02a7f211;
+	--accent-a3: #00befd28;
+	--accent-a4: #00baff3b;
+	--accent-a5: #00befd4d;
+	--accent-a6: #00c7fd5e;
+	--accent-a7: #14cdff75;
+	--accent-a8: #11cfff95;
+	--accent-a9: #00cfffc3;
+	--accent-a10: #28d6ffcd;
+	--accent-a11: #52e1fee5;
+	--accent-a12: #bbf3fef7;
 
 	/* Error */
 	--error-1: #191113;

@@ -1515,7 +1515,9 @@ export async function ensureSharedHubClient(
 				cwd: ctx.localWorkspaceRoot,
 			}));
 		if (!url) {
-			throw new Error("Unable to start or connect to the shared Cline Hub.");
+			throw new Error(
+				"Unable to start or connect to the Segra Desktop background service.",
+			);
 		}
 
 		const client = new NodeHubClient({

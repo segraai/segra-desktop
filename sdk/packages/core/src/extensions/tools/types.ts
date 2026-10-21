@@ -84,6 +84,18 @@ export type ShellExecutor = (
 ) => Promise<string>;
 
 /**
+ * Executor for web searches
+ *
+ * @param query - Search keywords
+ * @param context - Tool execution context
+ * @returns Formatted results (titles, URLs, snippets)
+ */
+export type WebSearchExecutor = (
+	query: string,
+	context: AgentToolContext,
+) => Promise<string>;
+
+/**
  * Executor for fetching web content
  *
  * @param url - URL to fetch
@@ -206,6 +218,8 @@ export interface ToolExecutors {
 	bash?: ShellExecutor;
 	/** Web content fetching implementation */
 	webFetch?: WebFetchExecutor;
+	/** Web search implementation (enabled together with web fetch) */
+	webSearch?: WebSearchExecutor;
 	/** Filesystem editor implementation */
 	editor?: EditorExecutor;
 	/** Apply patch implementation */

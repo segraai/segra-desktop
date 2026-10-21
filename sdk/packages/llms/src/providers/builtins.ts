@@ -57,6 +57,7 @@ import {
 import { BEDROCK_ROUTING_METADATA } from "./routing/bedrock-cache-point";
 import { GLM_THINKING_ROUTING_METADATA } from "./routing/glm-thinking";
 import { MINIMAX_THINKING_ROUTING_METADATA } from "./routing/minimax-thinking";
+import { SEGRA_DEFAULT_BASE_URL, SEGRA_PROVIDER_ID } from "./vendors/segra";
 
 export const DEFAULT_INTERNAL_OCA_BASE_URL =
 	"https://code-internal.aiservice.us-chicago-1.oci.oraclecloud.com/20250206/app/litellm";
@@ -1105,6 +1106,34 @@ const OPENAI_COMPATIBLE_SPEC_OVERRIDES: BuiltinSpecOverride[] = [
 		defaults: { baseUrl: "http://localhost:1234/v1" },
 		modelsSourceUrl: "http://localhost:1234/v1/models",
 		metadata: { apiKeyOptional: true },
+	},
+	{
+		// Private TEE-attested models. Users sign in with their Segra account
+		// (device flow, core/src/auth/segra.ts), which stores a Segra API key.
+		// The key only mints short-lived provider sessions; requests go straight
+		// to the provider (see vendors/segra.ts).
+		id: SEGRA_PROVIDER_ID,
+		name: "Segra",
+		description:
+			"Private, TEE-attested models. Your code never passes through Segra.",
+		family: "openai-compatible",
+		popular: 0,
+		capabilities: ["tools", "oauth"],
+		defaultModelId: "",
+		apiKeyEnv: ["SEGRA_API_KEY"],
+		// Models depend on which providers Segra can pay for right now.
+		modelsFactory: () => ({}),
+		defaults: { baseUrl: SEGRA_DEFAULT_BASE_URL },
+		modelsSourceUrl: `${SEGRA_DEFAULT_BASE_URL}/models`,
+		docsUrl: "https://segra.ai",
+		configFields: [
+			{
+				...BASE_URL_FIELD,
+				placeholder: SEGRA_DEFAULT_BASE_URL,
+				description:
+					"Segra server. Change it only for a self-hosted or staging Segra server.",
+			},
+		],
 	},
 	{
 		id: "oca",

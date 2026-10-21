@@ -11,7 +11,7 @@ import type {
 
 const CHAT_WORKSPACE_RULES = `# Cline chat workspace
 
-This directory is Cline's shared workspace for chat sessions that were
+This directory is Segra Desktop's shared workspace for chat sessions that were
 started without a project. It is not a project of its own, and other chat
 sessions use it too. Treat the conversation as a chat first: do not create
 or edit files here unless the user asks for something that requires them.

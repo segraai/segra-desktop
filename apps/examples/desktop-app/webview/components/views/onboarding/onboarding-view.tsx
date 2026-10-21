@@ -10,10 +10,12 @@ import {
 	Import,
 	KeyRound,
 	Loader2,
+	ShieldCheck,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ClineLogo } from "@/components/cline-logo";
 import { ImportSessionsDialog } from "@/components/import-sessions-dialog";
+import { SegraWelcomeHero } from "@/components/segra-logo";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,7 +27,10 @@ import {
 } from "@/components/ui/select";
 import { GitHubConnectStep } from "@/components/views/onboarding/onboarding-github-step";
 import { useAccount } from "@/contexts/account-context";
-import { OAUTH_MANAGED_PROVIDERS } from "@/hooks/chat-session/constants";
+import {
+	OAUTH_MANAGED_PROVIDERS,
+	SEGRA_DEFAULT_MODEL_ID,
+} from "@/hooks/chat-session/constants";
 import { useClineSignIn } from "@/hooks/use-cline-sign-in";
 import { isFeatureEnabled, useFeatureFlags } from "@/hooks/use-feature-flags";
 import { useOAuthUserCode } from "@/hooks/use-oauth-user-code";
@@ -42,6 +47,7 @@ import {
 import {
 	fetchProviderCatalog,
 	invalidateProviderCatalogCache,
+	loadProviderModels,
 } from "@/lib/provider-model-catalog";
 import type { Provider } from "@/lib/provider-schema";
 import {
@@ -55,6 +61,16 @@ import { cn } from "@/lib/utils";
 const CREATE_ACCOUNT_URL = "https://app.cline.bot";
 const CLINE_PASS_SUBSCRIBE_URL =
 	"https://app.cline.bot/onboarding/individual-plan";
+
+// Segra Desktop signs in with Segra; the upstream Cline account option stays in
+// the code (to keep upstream merges simple) but is not shown.
+const SHOW_CLINE_ACCOUNT_SIGN_IN = false;
+
+const SEGRA_SIGN_IN_BENEFITS = [
+	"Private models running in sealed hardware (TEEs)",
+	"Your code and prompts never pass through Segra",
+	"Uses your Segra credits, no API keys to copy",
+];
 
 const CLINE_SIGN_IN_BENEFITS = [
 	"Regular free model promotions",
@@ -79,13 +95,14 @@ type OnboardingConnection =
 	| { kind: "cline" }
 	| { kind: "provider"; providerName: string };
 
-type SetupMethod = "cline" | "api-key";
+type SetupMethod = "segra" | "cline" | "api-key";
 
 /**
  * Providers surfaced first in the bring-your-own-key picker. Everything else
  * from the catalog follows alphabetically.
  */
 const PREFERRED_PROVIDER_ORDER = [
+	"segra",
 	"anthropic",
 	"openai-native",
 	"openrouter",
@@ -299,14 +316,18 @@ function WelcomeStep({ onContinue }: { onContinue: () => void }) {
 		<OnboardingContent surface="transparent">
 			<div className="flex flex-col items-center py-4 text-center">
 				<div className="w-full">
-					<AgentWelcomeHero variant="bot-only" />
+					<SegraWelcomeHero grid={false} />
 				</div>
-				<h1 className="mt-5 text-4xl font-semibold text-foreground">Cline</h1>
-				<p className="mt-2 text-lg text-foreground">Build software your way</p>
+				<h1 className="mt-5 text-4xl font-semibold text-foreground">
+					Segra Desktop
+				</h1>
+				<p className="mt-2 text-lg text-foreground">
+					Private AI coding, sealed in hardware
+				</p>
 				<p className="mt-6 text-md text-muted-foreground">
-					Cline is an AI coding agent. It reads your code, edits files, runs
-					commands, and works through tasks with you — in any project on your
-					machine.
+					Segra Desktop is an AI coding agent. It reads your code, edits files,
+					runs commands, and searches the web from your machine, using models
+					that run in sealed hardware so your code stays private.
 				</p>
 				<Button
 					className="mt-8 w-full max-w-64"
@@ -356,6 +377,24 @@ function ConnectStep({
 		onSettled: invalidateProviderCatalogCache,
 	});
 	const deviceUserCode = useOAuthUserCode(signingIn);
+	const segraSignIn = useClineSignIn({
+		provider: "segra",
+		onSuccess: async (signal) => {
+			// Open the composer on a real Segra model rather than a placeholder.
+			const defaultModelId = await loadProviderModels("segra")
+				.then(
+					(models) =>
+						models.find((model) => model.id === SEGRA_DEFAULT_MODEL_ID)?.id ??
+						models[0]?.id,
+				)
+				.catch(() => undefined);
+			if (signal.aborted) return;
+			rememberProviderSelection({ id: "segra", defaultModelId });
+			onConnected({ kind: "provider", providerName: "Segra" });
+		},
+		onSettled: invalidateProviderCatalogCache,
+	});
+	const segraUserCode = useOAuthUserCode(segraSignIn.signingIn);
 	const [clineApiKey, setClineApiKey] = useState("");
 	const [clineKeySaving, setClineKeySaving] = useState(false);
 	const [clineKeyError, setClineKeyError] = useState<string | null>(null);
@@ -486,7 +525,7 @@ function ConnectStep({
 		}
 	}, [apiKey, onConnected, selectedProvider, selectedProviderId]);
 
-	const [selectedMethod, setSelectedMethod] = useState<SetupMethod>("cline");
+	const [selectedMethod, setSelectedMethod] = useState<SetupMethod>("segra");
 	const [clineKeyFormExpanded, setClineKeyFormExpanded] = useState(false);
 
 	return (
@@ -504,20 +543,23 @@ function ConnectStep({
 					<ArrowLeft className="size-4" />
 				</IconButton>
 				<h1 className="mt-6 text-2xl font-semibold tracking-tight text-foreground">
-					Set up Cline
+					Set up Segra Desktop
 				</h1>
 				<p className="mt-4 text-sm text-muted-foreground">
-					Choose how Cline connects to models. You can add more providers
-					anytime in Settings.
+					Choose how Segra Desktop connects to models. You can add more
+					providers anytime in Settings.
 				</p>
 			</div>
 
 			<div className="mt-8 flex flex-col gap-3">
 				<SetupOptionCard
-					id="cline"
-					onSelect={() => setSelectedMethod("cline")}
-					selectLabel="Sign in with Cline"
-					selected={selectedMethod === "cline"}
+					id="segra"
+					onSelect={() => {
+						setSelectedMethod("segra");
+						setClineKeyFormExpanded(false);
+					}}
+					selectLabel="Sign in with Segra"
+					selected={selectedMethod === "segra"}
 				>
 					<SetupOptionHeader
 						accessory={
@@ -530,7 +572,7 @@ function ConnectStep({
 						}
 						description={
 							<ul className="flex flex-col gap-1">
-								{CLINE_SIGN_IN_BENEFITS.map((benefit) => (
+								{SEGRA_SIGN_IN_BENEFITS.map((benefit) => (
 									<li className="flex gap-2" key={benefit}>
 										<Check
 											aria-hidden="true"
@@ -541,166 +583,235 @@ function ConnectStep({
 								))}
 							</ul>
 						}
-						icon={<ClineLogo className="size-5" />}
-						title="Sign in with Cline"
+						icon={<ShieldCheck className="size-5" />}
+						title="Sign in with Segra"
 					/>
-					{user ? (
-						<div className="mt-6 flex flex-wrap items-center justify-end gap-6">
-							<p className="text-sm text-muted-foreground">
-								Signed in as{" "}
-								<span className="font-medium">
-									{user.displayName || user.email}
-								</span>
-							</p>
-							<Button
-								onClick={() => {
-									rememberProviderSelection({ id: "cline" });
-									onConnected({ kind: "cline" });
-								}}
-								size="md"
-								tone="accent"
-								type="button"
-								variant="fill"
-							>
-								Continue
-							</Button>
-						</div>
-					) : (
-						<div className="mt-8 ml-12 flex flex-wrap items-center gap-1 max-[720px]:ml-0">
-							<Button
-								disabled={clineBusy}
-								onClick={() => void signInWithCline()}
-								size="md"
-								tone="accent"
-								type="button"
-								variant="fill"
-							>
-								{signingIn && <Loader2 className="size-4 animate-spin" />}
-								{signingIn ? "Waiting for browser..." : "Sign in"}
-							</Button>
-							{signingIn ? (
-								<Button
-									disabled={cancelling}
-									onClick={() => void cancelSignInWithCline()}
-									size="md"
-									tone="neutral"
-									type="button"
-									variant="ghost"
-								>
-									Cancel
-								</Button>
-							) : (
-								<Button
-									onClick={() => void openExternalUrl(CREATE_ACCOUNT_URL)}
-									size="md"
-									tone="neutral"
-									type="button"
-									variant="ghost"
-								>
-									Sign up
-								</Button>
-							)}
-						</div>
-					)}
-					{!user && signingIn && deviceUserCode ? (
-						<p className="mt-4 ml-12 text-sm text-muted-foreground max-[720px]:ml-0">
-							Confirm this code in your browser:{" "}
-							<span className="font-mono font-medium text-foreground">
-								{deviceUserCode}
-							</span>
-						</p>
-					) : null}
-					{signInError ? (
-						<p
-							className="mt-6 ml-12 text-xs text-destructive max-[720px]:ml-0"
-							role="alert"
+					<div className="mt-8 ml-12 flex flex-wrap items-center gap-1 max-[720px]:ml-0">
+						<Button
+							disabled={segraSignIn.signingIn}
+							onClick={() => void segraSignIn.signIn()}
+							size="md"
+							tone="accent"
+							type="button"
+							variant="fill"
 						>
-							Sign in failed: {signInError}
-						</p>
-					) : null}
-					{!user ? (
-						<div className="mt-6 ml-10 -mb-2 max-[720px]:ml-0">
+							{segraSignIn.signingIn && (
+								<Loader2 className="size-4 animate-spin" />
+							)}
+							{segraSignIn.signingIn ? "Waiting for browser..." : "Sign in"}
+						</Button>
+						{segraSignIn.signingIn ? (
 							<Button
-								aria-controls="onboarding-cline-key-form"
-								aria-expanded={clineKeyFormExpanded}
-								disabled={clineBusy}
-								onClick={() => {
-									setSelectedMethod("cline");
-									setClineKeyFormExpanded(!clineKeyFormExpanded);
-								}}
-								size="xs"
+								disabled={segraSignIn.cancelling}
+								onClick={() => void segraSignIn.cancelSignIn()}
+								size="md"
 								tone="neutral"
 								type="button"
 								variant="ghost"
 							>
-								Use a Cline API key
-								<ChevronDown aria-hidden="true" className="size-3.5" />
+								Cancel
 							</Button>
-							<ExpandablePanel
-								data-onboarding-cline-key-form
-								expanded={clineKeyFormExpanded}
-								id="onboarding-cline-key-form"
-							>
-								<div className="flex flex-col gap-2 pt-3 ml-2 max-[720px]:ml-0">
-									<div className="flex flex-wrap items-center gap-2">
-										<Input
-											aria-label="Cline API key"
-											autoComplete="off"
-											className="min-w-52 flex-1 bg-background"
-											disabled={clineKeySaving}
-											onChange={(event) => {
-												setClineApiKey(event.target.value);
-												setClineKeyError(null);
-											}}
-											onKeyDown={(event) => {
-												if (
-													event.key === "Enter" &&
-													clineApiKey.trim() &&
-													!clineKeySaving
-												) {
-													void connectWithClineApiKey();
-												}
-											}}
-											placeholder="Cline API key"
-											type="password"
-											value={clineApiKey}
-										/>
-										<Button
-											disabled={!clineApiKey.trim() || clineKeySaving}
-											onClick={() => void connectWithClineApiKey()}
-											size="md"
-											tone="accent"
-											type="button"
-											variant="fill"
-										>
-											{clineKeySaving ? (
-												<Loader2 className="size-4 animate-spin" />
-											) : null}
-											{clineKeySaving ? "Connecting..." : "Connect"}
-										</Button>
-									</div>
+						) : null}
+					</div>
+					{segraSignIn.signingIn && segraUserCode ? (
+						<p className="mt-4 ml-12 text-sm text-muted-foreground max-[720px]:ml-0">
+							Confirm this code in your browser:{" "}
+							<span className="font-mono font-medium text-foreground">
+								{segraUserCode}
+							</span>
+						</p>
+					) : null}
+					{segraSignIn.error ? (
+						<p
+							className="mt-6 ml-12 text-xs text-destructive max-[720px]:ml-0"
+							role="alert"
+						>
+							Sign in failed: {segraSignIn.error}
+						</p>
+					) : null}
+				</SetupOptionCard>
+				{SHOW_CLINE_ACCOUNT_SIGN_IN ? (
+					<SetupOptionCard
+						id="cline"
+						onSelect={() => setSelectedMethod("cline")}
+						selectLabel="Sign in with Cline"
+						selected={selectedMethod === "cline"}
+					>
+						<SetupOptionHeader
+							description={
+								<ul className="flex flex-col gap-1">
+									{CLINE_SIGN_IN_BENEFITS.map((benefit) => (
+										<li className="flex gap-2" key={benefit}>
+											<Check
+												aria-hidden="true"
+												className="mt-0.5 size-3.5 shrink-0 text-primary"
+											/>
+											<span>{benefit}</span>
+										</li>
+									))}
+								</ul>
+							}
+							icon={<ClineLogo className="size-5" />}
+							title="Sign in with Cline"
+						/>
+						{user ? (
+							<div className="mt-6 flex flex-wrap items-center justify-end gap-6">
+								<p className="text-sm text-muted-foreground">
+									Signed in as{" "}
+									<span className="font-medium">
+										{user.displayName || user.email}
+									</span>
+								</p>
+								<Button
+									onClick={() => {
+										rememberProviderSelection({ id: "cline" });
+										onConnected({ kind: "cline" });
+									}}
+									size="md"
+									tone="accent"
+									type="button"
+									variant="fill"
+								>
+									Continue
+								</Button>
+							</div>
+						) : (
+							<div className="mt-8 ml-12 flex flex-wrap items-center gap-1 max-[720px]:ml-0">
+								<Button
+									disabled={clineBusy}
+									onClick={() => void signInWithCline()}
+									size="md"
+									tone="accent"
+									type="button"
+									variant="fill"
+								>
+									{signingIn && <Loader2 className="size-4 animate-spin" />}
+									{signingIn ? "Waiting for browser..." : "Sign in"}
+								</Button>
+								{signingIn ? (
 									<Button
-										className="self-start -ml-1 mt-1"
-										disabled={clineKeySaving}
-										onClick={() => void openExternalUrl(CLINE_DASHBOARD_URL)}
-										size="xs"
+										disabled={cancelling}
+										onClick={() => void cancelSignInWithCline()}
+										size="md"
 										tone="neutral"
 										type="button"
 										variant="ghost"
 									>
-										Find your key
-										<ExternalLink className="size-3" />
+										Cancel
 									</Button>
-									{clineKeyError ? (
-										<p className="text-xs text-destructive" role="alert">
-											Failed to save API key: {clineKeyError}
-										</p>
-									) : null}
-								</div>
-							</ExpandablePanel>
-						</div>
-					) : null}
-				</SetupOptionCard>
+								) : (
+									<Button
+										onClick={() => void openExternalUrl(CREATE_ACCOUNT_URL)}
+										size="md"
+										tone="neutral"
+										type="button"
+										variant="ghost"
+									>
+										Sign up
+									</Button>
+								)}
+							</div>
+						)}
+						{!user && signingIn && deviceUserCode ? (
+							<p className="mt-4 ml-12 text-sm text-muted-foreground max-[720px]:ml-0">
+								Confirm this code in your browser:{" "}
+								<span className="font-mono font-medium text-foreground">
+									{deviceUserCode}
+								</span>
+							</p>
+						) : null}
+						{signInError ? (
+							<p
+								className="mt-6 ml-12 text-xs text-destructive max-[720px]:ml-0"
+								role="alert"
+							>
+								Sign in failed: {signInError}
+							</p>
+						) : null}
+						{!user ? (
+							<div className="mt-6 ml-10 -mb-2 max-[720px]:ml-0">
+								<Button
+									aria-controls="onboarding-cline-key-form"
+									aria-expanded={clineKeyFormExpanded}
+									disabled={clineBusy}
+									onClick={() => {
+										setSelectedMethod("cline");
+										setClineKeyFormExpanded(!clineKeyFormExpanded);
+									}}
+									size="xs"
+									tone="neutral"
+									type="button"
+									variant="ghost"
+								>
+									Use a Cline API key
+									<ChevronDown aria-hidden="true" className="size-3.5" />
+								</Button>
+								<ExpandablePanel
+									data-onboarding-cline-key-form
+									expanded={clineKeyFormExpanded}
+									id="onboarding-cline-key-form"
+								>
+									<div className="flex flex-col gap-2 pt-3 ml-2 max-[720px]:ml-0">
+										<div className="flex flex-wrap items-center gap-2">
+											<Input
+												aria-label="Cline API key"
+												autoComplete="off"
+												className="min-w-52 flex-1 bg-background"
+												disabled={clineKeySaving}
+												onChange={(event) => {
+													setClineApiKey(event.target.value);
+													setClineKeyError(null);
+												}}
+												onKeyDown={(event) => {
+													if (
+														event.key === "Enter" &&
+														clineApiKey.trim() &&
+														!clineKeySaving
+													) {
+														void connectWithClineApiKey();
+													}
+												}}
+												placeholder="Cline API key"
+												type="password"
+												value={clineApiKey}
+											/>
+											<Button
+												disabled={!clineApiKey.trim() || clineKeySaving}
+												onClick={() => void connectWithClineApiKey()}
+												size="md"
+												tone="accent"
+												type="button"
+												variant="fill"
+											>
+												{clineKeySaving ? (
+													<Loader2 className="size-4 animate-spin" />
+												) : null}
+												{clineKeySaving ? "Connecting..." : "Connect"}
+											</Button>
+										</div>
+										<Button
+											className="self-start -ml-1 mt-1"
+											disabled={clineKeySaving}
+											onClick={() => void openExternalUrl(CLINE_DASHBOARD_URL)}
+											size="xs"
+											tone="neutral"
+											type="button"
+											variant="ghost"
+										>
+											Find your key
+											<ExternalLink className="size-3" />
+										</Button>
+										{clineKeyError ? (
+											<p className="text-xs text-destructive" role="alert">
+												Failed to save API key: {clineKeyError}
+											</p>
+										) : null}
+									</div>
+								</ExpandablePanel>
+							</div>
+						) : null}
+					</SetupOptionCard>
+				) : null}
 				<SetupOptionCard
 					id="api-key"
 					onSelect={() => {
@@ -711,7 +822,7 @@ function ConnectStep({
 					selected={selectedMethod === "api-key"}
 				>
 					<SetupOptionHeader
-						description="Anthropic, OpenAI, OpenRouter, and more."
+						description="Anthropic, OpenAI, OpenRouter, and more. Requests go to that provider, not to a sealed (TEE) model."
 						icon={<KeyRound className="size-4" />}
 						title="Use your own API key"
 					/>
@@ -926,8 +1037,8 @@ function ImportHistoryStep({
 				</h1>
 				<p className="mt-3 text-md text-muted-foreground">
 					{imported
-						? "Your sessions are in Cline's history now. You can import more anytime from the Sessions page."
-						: `Cline found ${found.count} session${found.count === 1 ? "" : "s"} from ${toolList} on this machine. Import them to keep your past conversations — and continue them here.`}
+						? "Your sessions are in Segra Desktop's history now. You can import more anytime from the Sessions page."
+						: `Segra Desktop found ${found.count} session${found.count === 1 ? "" : "s"} from ${toolList} on this machine. Import them to keep your past conversations — and continue them here.`}
 				</p>
 				{imported ? (
 					<Button

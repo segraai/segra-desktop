@@ -1102,7 +1102,9 @@ describe("AgentSidebar session organization", () => {
 			);
 		});
 
-		const logoButton = container.querySelector('[aria-label="Cline home"]');
+		const logoButton = container.querySelector(
+			'[aria-label="Segra Desktop home"]',
+		);
 		expect(logoButton).not.toBeNull();
 		expect(document.body.textContent).not.toContain("Version 1.2.3");
 
@@ -1110,7 +1112,7 @@ describe("AgentSidebar session organization", () => {
 
 		await vi.waitFor(() => {
 			expect(document.body.textContent).toContain("Version 1.2.3");
-			expect(document.body.textContent).toContain("Cline Hub @25463");
+			expect(document.body.textContent).toContain("Hub @25463");
 			expect(document.body.textContent).not.toContain(
 				"ws://127.0.0.1:25463/hub",
 			);
@@ -1150,12 +1152,14 @@ describe("AgentSidebar session organization", () => {
 			);
 		});
 
-		const logoButton = container.querySelector('[aria-label="Cline home"]');
+		const logoButton = container.querySelector(
+			'[aria-label="Segra Desktop home"]',
+		);
 		expect(logoButton).not.toBeNull();
 		await hover(logoButton as Element);
 
 		await vi.waitFor(() => {
-			expect(document.body.textContent).toContain("Cline Hub @25463");
+			expect(document.body.textContent).toContain("Hub @25463");
 			expect(document.body.textContent).toContain(
 				"Hub connection closed (code=1006)",
 			);
@@ -1221,7 +1225,7 @@ describe("AgentSidebar session organization", () => {
 			);
 		});
 
-		const logo = container.querySelector('[aria-label="Cline home"]');
+		const logo = container.querySelector('[aria-label="Segra Desktop home"]');
 		const actionsNav = container.querySelector(
 			'[aria-label="Sidebar actions"]',
 		);
@@ -1378,7 +1382,7 @@ describe("AgentSidebar session organization", () => {
 		expect(document.querySelector('[data-slot="command-input"]')).toBeNull();
 	});
 
-	it("uses only the Cline logo for home in the collapsed sidebar", async () => {
+	it("uses only the Segra logo for home in the collapsed sidebar", async () => {
 		await act(async () => {
 			root.render(
 				<AccountProvider>
@@ -1397,7 +1401,9 @@ describe("AgentSidebar session organization", () => {
 			);
 		});
 
-		expect(container.querySelector('[aria-label="Cline home"]')).not.toBeNull();
+		expect(
+			container.querySelector('[aria-label="Segra Desktop home"]'),
+		).not.toBeNull();
 		expect(
 			container.querySelector('[aria-label="Sidebar actions"]'),
 		).toBeNull();
@@ -1436,9 +1442,8 @@ describe("AgentSidebar session organization", () => {
 			container.querySelector('[aria-label="Settings sections"]'),
 		).not.toBeNull();
 		const leftAlignedButtons = [
-			"Cline home",
+			"Segra Desktop home",
 			"General",
-			"Account",
 			"Expand sidebar",
 			"Settings",
 		];

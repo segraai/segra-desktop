@@ -11,6 +11,7 @@ import { wrapLanguageModel } from "ai";
 import { ensureFetch, resolveApiKey } from "../http";
 import { splitToolImagesMiddleware } from "../middleware/split-tool-images";
 import { isOpenAIReasoningEraModelId } from "../model-facts";
+import { createSegraFetch, SEGRA_PROVIDER_ID } from "./segra";
 import type { ProviderFactoryResult } from "./types";
 
 type FetchInput = Parameters<typeof fetch>[0];
@@ -232,7 +233,10 @@ export async function createOpenAICompatibleProviderModule(
 	// authoritative error and is surfaced to the user as-is. This keeps
 	// `llms` unopinionated about which providers do or don't need a key.
 	const apiKey = await resolveApiKey(config);
-	const fetch = createAzureApiVersionFetch(config);
+	const fetch =
+		context.provider.id === SEGRA_PROVIDER_ID
+			? createSegraFetch(ensureFetch(config.fetch), config.baseUrl)
+			: createAzureApiVersionFetch(config);
 	const onResponseError = readResponseErrorHandler(config);
 	const providerFetch = onResponseError
 		? createResponseErrorFetch({

@@ -570,8 +570,8 @@ export function ComposioConnectorsView({
 				<div className="grid gap-4">
 					<div className="flex items-center justify-between gap-3">
 						<p className="text-sm text-muted-foreground">
-							Connect your accounts to give Cline tools for your favorite apps.
-							Tools become available in new sessions.
+							Connect your accounts to give Segra Desktop tools for your
+							favorite apps. Tools become available in new sessions.
 						</p>
 						<Button
 							aria-label="Refresh connectors"
@@ -638,7 +638,7 @@ export function ComposioConnectorsView({
 						<div className="rounded-lg border border-dashed bg-card p-6 text-center text-sm text-muted-foreground">
 							{trimmedInstalledQuery
 								? `No installed connectors match "${installedQuery.trim()}".`
-								: "No connectors installed. Install a connector below or ask Cline about it in a task."}
+								: "No connectors installed. Install a connector below or ask Segra Desktop about it in a task."}
 						</div>
 					)}
 				</section>
@@ -710,8 +710,8 @@ export function ComposioConnectorsView({
 				<div className="flex flex-wrap items-center justify-between gap-3">
 					<p className="text-sm text-muted-foreground">
 						<Badge className="mr-1">Beta</Badge>Connect your accounts to give
-						Cline tools for your favorite apps. Tools will become available in
-						new sessions.
+						Segra Desktop tools for your favorite apps. Tools will become
+						available in new sessions.
 					</p>
 					{searchQuery === undefined ? (
 						<div className="relative">
@@ -809,7 +809,7 @@ function ConnectorsUnavailable({
 					<p className="text-sm text-muted-foreground">
 						{signedIn
 							? "Connectors are rolling out in beta. Once your Cline account has access, Gmail, Slack, GitHub, and hundreds of other apps will show up here with one-click install."
-							: "Connectors give Cline tools for Gmail, Slack, GitHub, and hundreds of other apps with a quick sign-in to each, no API keys. They require a Cline account."}
+							: "Connectors give Segra Desktop tools for Gmail, Slack, GitHub, and hundreds of other apps with a quick sign-in to each, no API keys. They require a Cline account."}
 					</p>
 				</div>
 				{signedIn ? (

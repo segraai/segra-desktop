@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SpeechInput } from "@/components/ai-elements/speech-input";
+import { FILES_DROPPED_EVENT } from "@/components/file-drop-guard";
 import {
 	Select,
 	SelectContent,
@@ -511,6 +512,7 @@ function ChatInputBarImpl({
 					: " Other files can still be attached."),
 		});
 	}, [executionTarget]);
+	const [fileDragActive, setFileDragActive] = useState(false);
 	const handleAttachFiles = useCallback(
 		(files: File[]) => {
 			const supportedFiles =
@@ -537,6 +539,17 @@ function ChatInputBarImpl({
 			reportUnsupportedImages,
 		],
 	);
+	// Files dropped elsewhere in the window (see FileDropGuard) attach here.
+	useEffect(() => {
+		if (readOnly) return;
+		const onFilesDropped = (event: Event) => {
+			const files = (event as CustomEvent<File[]>).detail;
+			if (files?.length) handleAttachFiles(files);
+		};
+		window.addEventListener(FILES_DROPPED_EVENT, onFilesDropped);
+		return () =>
+			window.removeEventListener(FILES_DROPPED_EVENT, onFilesDropped);
+	}, [handleAttachFiles, readOnly]);
 	const unsupportedDraftImageCount = imagesUnsupported
 		? attachments.filter((attachment) => attachment.isImage).length
 		: 0;
@@ -579,7 +592,7 @@ function ChatInputBarImpl({
 			toast({
 				title: "Add a message to go with your attachments",
 				description:
-					"Describe what you want Cline to do with the attached files before sending.",
+					"Describe what you want Segra Desktop to do with the attached files before sending.",
 			});
 			return;
 		}
@@ -783,7 +796,7 @@ function ChatInputBarImpl({
 			variant: "destructive",
 			title: "Speech input failed",
 			description: isMicrophoneError
-				? "Check the microphone permission for Cline and try again."
+				? "Check the microphone permission for Segra Desktop and try again."
 				: message,
 		});
 	}, []);
@@ -1106,8 +1119,35 @@ function ChatInputBarImpl({
 		[promptsInQueue],
 	);
 
+	const draggedFiles = (event: React.DragEvent) =>
+		Array.from(event.dataTransfer?.types ?? []).includes("Files");
+
 	return (
-		<AgentComposer variant={variant}>
+		<AgentComposer
+			className={cn(fileDragActive && "!border-primary ring-2 ring-primary/30")}
+			data-file-drag-active={fileDragActive || undefined}
+			onDragLeave={(event) => {
+				// Ignore leaves into child elements of the composer.
+				if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+					setFileDragActive(false);
+				}
+			}}
+			onDragOver={(event) => {
+				if (!draggedFiles(event) || readOnly) return;
+				event.preventDefault();
+				event.dataTransfer.dropEffect = "copy";
+				setFileDragActive(true);
+			}}
+			onDrop={(event) => {
+				if (!draggedFiles(event)) return;
+				event.preventDefault();
+				setFileDragActive(false);
+				if (readOnly) return;
+				const files = Array.from(event.dataTransfer.files);
+				if (files.length > 0) handleAttachFiles(files);
+			}}
+			variant={variant}
+		>
 			{/* Input area */}
 			<PullRequestBar cwd={workspaceRoot} branch={gitBranch} />
 			<AgentComposerBody variant={variant} hasQueue={promptsInQueue.length > 0}>
@@ -1371,7 +1411,7 @@ function ChatInputBarImpl({
 												? "Agent is working... submit to queue another message, or Enter to send the first message from the queue"
 												: "Agent is working... submit to queue another message"
 											: executionTarget === "cloud"
-												? "Describe what Cline should do in this repository."
+												? "Describe what Segra Desktop should do in this repository."
 												: variant === "welcome"
 													? "Ask to make changes, @mention files, reference #PRs, or run /commands."
 													: "Enter your question or type / for commands or @ for context"
@@ -1500,7 +1540,9 @@ function ChatInputBarImpl({
 						<Paperclip className="size-3" />
 					</button>
 					<input
-						accept={executionTarget === "cloud" ? "image/*" : "*/*"}
+						// No accept filter for local files: WebKitGTK turns "*/*" into a
+						// GTK filter that matches nothing, so the picker looks empty.
+						accept={executionTarget === "cloud" ? "image/*" : undefined}
 						className="hidden"
 						multiple
 						onChange={(event) => {

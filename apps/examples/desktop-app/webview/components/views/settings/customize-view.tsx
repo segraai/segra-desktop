@@ -31,8 +31,9 @@ type CustomizeTab =
 	| "hooks"
 	| "tools";
 
+// Segra Desktop: Connectors (Composio) require an upstream Cline account, so the
+// tab is not offered.
 const CUSTOMIZE_TABS: { id: CustomizeTab; label: string }[] = [
-	{ id: "integrations", label: "Connectors" },
 	{ id: "tools", label: "Tools" },
 	{ id: "plugins", label: "Plugins" },
 	{ id: "skills", label: "Skills" },
@@ -64,9 +65,7 @@ export function CustomizeView({
 	onOpenMarketplace?: (filter?: "connector") => void;
 	onOpenModelProviders?: () => void;
 }) {
-	// Connectors is always the first tab; when the account cannot use them
-	// the tab itself explains why and offers sign-in.
-	const [tab, setTab] = useState<CustomizeTab>("integrations");
+	const [tab, setTab] = useState<CustomizeTab>("tools");
 	const [counts, setCounts] = useState<TabCounts>({});
 
 	const refreshCounts = useCallback(async () => {
@@ -137,7 +136,7 @@ export function CustomizeView({
 						</Button>
 					) : undefined
 				}
-				description="Extend what Cline can do and how it works. Explore the marketplace for more options."
+				description="Extend what Segra Desktop can do and how it works. Explore the marketplace for more options."
 				title="Customize"
 			/>
 

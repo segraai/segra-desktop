@@ -806,14 +806,14 @@ async function installSkill(
 	}
 	if (!isGlobalSkillInstalled(entry)) {
 		throw new Error(
-			`Skill install completed, but ${entry.name ?? entry.id} was not found in Cline's global skills directories.`,
+			`Skill install completed, but ${entry.name ?? entry.id} was not found in the global skills directories.`,
 		);
 	}
 	return {
 		id: entry.id,
 		type: entry.type,
 		status: "installed",
-		message: `Installed ${entry.name ?? entry.id} globally for Cline.`,
+		message: `Installed ${entry.name ?? entry.id} globally for Segra Desktop.`,
 		output,
 	};
 }

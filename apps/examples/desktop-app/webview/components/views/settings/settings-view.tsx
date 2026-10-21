@@ -657,7 +657,7 @@ export function SettingsView({
  * violet reads the live brand token so it always matches the default theme.
  */
 const ACCENT_OPTIONS: { id: HubAccent; label: string; swatch: string }[] = [
-	{ id: "violet", label: "Violet", swatch: "var(--brand-violet)" },
+	{ id: "violet", label: "Segra", swatch: "var(--brand-violet)" },
 	{ id: "graphite", label: "Graphite", swatch: "oklch(0.27 0.012 248)" },
 	{ id: "cyan", label: "Cyan", swatch: "oklch(0.6 0.12 222)" },
 	{ id: "pink", label: "Pink", swatch: "oklch(0.75 0.1 354)" },
@@ -914,7 +914,7 @@ function GeneralSettingsContent({
 					<div className="flex flex-col gap-1">
 						<p className="text-base font-semibold text-foreground">App icon</p>
 						<p className="text-sm text-muted-foreground">
-							Pick the icon Cline shows in the {appIconLocation}.
+							Pick the icon Segra Desktop shows in the {appIconLocation}.
 						</p>
 						{appIconError ? (
 							<p className="mt-2 text-xs text-destructive" role="alert">
@@ -985,7 +985,7 @@ function GeneralSettingsContent({
 					<div className="flex flex-col gap-1">
 						<p className="text-base font-semibold text-foreground">Telemetry</p>
 						<p className="text-sm text-muted-foreground">
-							Enable error and usage reports to help improve Cline.
+							Enable error and usage reports to help improve Segra Desktop.
 						</p>
 						{telemetryError ? (
 							<p className="mt-2 text-xs text-destructive" role="alert">
@@ -1006,8 +1006,8 @@ function GeneralSettingsContent({
 							New user experience
 						</p>
 						<p className="text-sm text-muted-foreground">
-							Replay the first-run experience new users see when they open Cline
-							for the first time.
+							Replay the first-run experience new users see when they open Segra
+							Code for the first time.
 						</p>
 					</div>
 					<Button

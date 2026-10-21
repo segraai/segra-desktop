@@ -1,5 +1,12 @@
 import { validateImageMedia } from "@cline/shared/browser";
 import type { ChatMessageImage } from "@/lib/chat-schema";
+import {
+	isBinaryFile,
+	isPdfFile,
+	officeKind,
+	officeToText,
+	pdfToText,
+} from "@/lib/document-text";
 import { imageAttachmentMediaType } from "@/lib/image-attachments";
 import type { SerializedAttachmentFile, SerializedAttachments } from "./types";
 
@@ -35,7 +42,24 @@ export async function serializeAttachments(
 			continue;
 		}
 
-		const content = await file.text();
+		let content: string;
+		const office = officeKind(file);
+		if (office) {
+			content = await officeToText(file, office).catch(
+				(error: unknown) =>
+					`[Segra Desktop could not read the attached file "${file.name}": ${error instanceof Error ? error.message : String(error)}. Ask the user to paste its contents instead.]`,
+			);
+		} else if (isPdfFile(file)) {
+			content = await pdfToText(file).catch(
+				(error: unknown) =>
+					`[The attached PDF "${file.name}" could not be read: ${error instanceof Error ? error.message : String(error)}]`,
+			);
+		} else if (await isBinaryFile(file)) {
+			// Say plainly that this is an app limitation, not a failed upload.
+			content = `[The user attached "${file.name}". Segra Desktop can't read this file type yet (${file.type || "binary file"}), so only its name is included. The upload itself worked. Ask the user to paste the relevant contents, or to export it as PDF or text.]`;
+		} else {
+			content = await file.text();
+		}
 		userFiles.push({
 			name: file.name,
 			content,

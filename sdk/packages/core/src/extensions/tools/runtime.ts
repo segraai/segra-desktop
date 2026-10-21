@@ -75,7 +75,7 @@ const BASE_TOOL_CATALOG: readonly RuntimeToolCatalogEntry[] = [
 		id: "fetch_web_content",
 		description:
 			"Fetch URL content and analyze it with a prompt describing what to extract.",
-		headlessToolNames: ["fetch_web_content"],
+		headlessToolNames: ["fetch_web_content", "search_web"],
 	},
 	{
 		id: "skills",

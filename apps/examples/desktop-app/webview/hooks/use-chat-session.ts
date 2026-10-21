@@ -2048,7 +2048,7 @@ export function useChatSession(environmentId: string) {
 						parsed.metadata as { hubReconnect?: unknown } | undefined
 					)?.hubReconnect;
 					if (hubReconnect === "started") {
-						setActivityLabel("Reconnecting to Cline Hub...");
+						setActivityLabel("Reconnecting to the background service...");
 					} else if (hubReconnect === "finished") {
 						setActivityLabel(null);
 					}

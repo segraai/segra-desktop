@@ -150,9 +150,10 @@ async function ensureQuickSetupInputValid(
 	if (
 		input.baseurl?.trim() &&
 		normalizedProvider !== BUILT_IN_PROVIDER.OPENAI_COMPATIBLE &&
-		normalizedProvider !== BUILT_IN_PROVIDER.OPENAI_NATIVE
+		normalizedProvider !== BUILT_IN_PROVIDER.OPENAI_NATIVE &&
+		normalizedProvider !== BUILT_IN_PROVIDER.SEGRA
 	) {
-		return "base URL is only supported for OpenAI and OpenAI-compatible providers";
+		return "base URL is only supported for OpenAI, OpenAI-compatible, and Segra providers";
 	}
 	if (
 		input.azureApiVersion?.trim() &&

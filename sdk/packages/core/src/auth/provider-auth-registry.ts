@@ -12,6 +12,7 @@ import {
 } from "./cline";
 import { getValidOpenAICodexCredentials, loginOpenAICodex } from "./codex";
 import { getValidOcaCredentials, loginOcaOAuth } from "./oca";
+import { loginSegra, refreshSegraCredentials } from "./segra";
 import type { OAuthCredentials, OAuthLoginCallbacks } from "./types";
 
 const WORKOS_TOKEN_PREFIX = "workos:";
@@ -256,6 +257,17 @@ const providerAuthHandlers = [
 				{ forceRefresh, telemetry },
 				{ mode: settings.oca?.mode, telemetry },
 			),
+	}),
+	createOAuthHandler({
+		providerId: "segra",
+		login: ({ settings, callbacks }) =>
+			loginSegra({ baseUrl: settings?.baseUrl, callbacks }),
+		refresh: ({ settings, credentials, forceRefresh }) =>
+			refreshSegraCredentials({
+				baseUrl: settings.baseUrl,
+				credentials,
+				forceRefresh,
+			}),
 	}),
 	createOAuthHandler({
 		providerId: "openai-codex",

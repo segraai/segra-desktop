@@ -25,6 +25,7 @@ export {
 	createSkillsTool,
 	createSubmitAndExitTool,
 	createWebFetchTool,
+	createWebSearchTool,
 } from "./definitions";
 // Built-in Executors
 export {
@@ -41,6 +42,7 @@ export {
 	createSearchExecutor,
 	createShellExecutor,
 	createWebFetchExecutor,
+	createWebSearchExecutor,
 	type DefaultExecutorsOptions,
 	type EditorExecutorOptions,
 	type FileReadExecutorOptions,
@@ -52,6 +54,7 @@ export {
 	type SearchExecutorOptions,
 	type ShellExecutorOptions,
 	type WebFetchExecutorOptions,
+	type WebSearchExecutorOptions,
 } from "./executors/index";
 export {
 	MAX_COMMAND_OUTPUT_CHARS,
@@ -130,6 +133,7 @@ export type {
 	ToolOperationResult,
 	VerifySubmitExecutor,
 	WebFetchExecutor,
+	WebSearchExecutor,
 } from "./types";
 
 // =============================================================================
