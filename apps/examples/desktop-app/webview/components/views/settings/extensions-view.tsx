@@ -38,7 +38,7 @@ import {
 	type MarketplaceLocalInstalledItemRenderContext,
 	MarketplaceView,
 } from "../marketplace-view";
-import { CommandBadge, PageFrame, PageHeader } from "../page-layout";
+import { PageFrame, PageHeader } from "../page-layout";
 import { WebSearchProviderGuidance } from "./web-search-provider-guidance";
 
 export type CustomizationSection =
@@ -59,16 +59,6 @@ const sectionDescriptions: Record<CustomizationSection, string> = {
 	Agents: "Review configured agents discovered from local settings.",
 	Plugins: "Manage installed plugins and add new plugins from the marketplace.",
 	Tools: "Inspect built-in tools and tools contributed by plugins.",
-};
-
-const sectionCommands: Record<CustomizationSection, string> = {
-	Rules: "cline config rules",
-	Hooks: "cline config hooks",
-	MCP: "cline mcp install",
-	Skills: "cline skill",
-	Agents: "cline config agents",
-	Plugins: "cline plugin",
-	Tools: "cline config tools",
 };
 
 type RuleItem = {
@@ -1426,7 +1416,6 @@ export function CustomizationSectionView({
 				<PageHeader
 					description={sectionDescriptions[activeTab]}
 					title={activeTab}
-					meta={<CommandBadge>{sectionCommands[activeTab]}</CommandBadge>}
 					actions={refreshButton}
 				/>
 			) : (

@@ -49,6 +49,10 @@ function useAppVersion(): string | null {
 	return appVersion;
 }
 
+// Segra: no update server is set up yet (the updater has no endpoints), so
+// the Updates row is hidden. Turn this on once updates are published.
+const UPDATES_ENABLED = false;
+
 function UpdateRow() {
 	const status = useAppUpdateStatus();
 	const [checking, setChecking] = useState(false);
@@ -273,7 +277,7 @@ export function AboutContent({
 				title={productNameForVersion(appVersion)}
 			/>
 			<section className="max-w-344">
-				<UpdateRow />
+				{UPDATES_ENABLED ? <UpdateRow /> : null}
 				{whatsNew ? (
 					<div className="flex items-center justify-between gap-5 border-b py-4 max-[720px]:flex-col max-[720px]:items-stretch">
 						<div className="flex flex-col gap-1">

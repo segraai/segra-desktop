@@ -46,12 +46,8 @@ export type WhatsNewRelease =
 // Cline's account features, so they are kept below for reference only.
 export const WHATS_NEW_RELEASES: WhatsNewRelease[] = [];
 
+// Cline's connectors spotlight is left out: connectors need a Cline account.
 export const UPSTREAM_CLINE_WHATS_NEW_RELEASES: WhatsNewRelease[] = [
-	{
-		id: "2026-10-connectors",
-		title: "Connect Segra Desktop to your apps",
-		spotlight: "connectors",
-	},
 	{
 		id: "2026-09-remote-and-parallel",
 		title: "Work anywhere, in parallel",

@@ -38,7 +38,7 @@ import {
 	type MarketplaceTag,
 } from "@/lib/marketplace";
 import { cn } from "@/lib/utils";
-import { CommandBadge, PageFrame, PageHeader } from "./page-layout";
+import { PageFrame, PageHeader } from "./page-layout";
 
 type EntryActionState =
 	| { status: "idle" }
@@ -126,12 +126,6 @@ const TYPE_FILTER_ORDER: MarketplacePrimitiveType[] = [
 	"mcp",
 	"skill",
 ];
-
-const primitiveCommands = {
-	mcp: "cline mcp install",
-	plugin: "cline plugin install",
-	skill: "cline skill add",
-} satisfies Record<MarketplacePrimitiveType, string>;
 
 export type MarketplaceLocalInstalledItemRenderContext = {
 	matchedEntries?: MarketplaceEntry[];
@@ -1121,11 +1115,6 @@ export function MarketplaceView({
 				<PageHeader
 					description={pageDetails.description}
 					title={pageDetails.title}
-					meta={
-						primitive ? (
-							<CommandBadge>{primitiveCommands[primitive]}</CommandBadge>
-						) : undefined
-					}
 					actions={
 						onOpenInstalled ? (
 							<Button

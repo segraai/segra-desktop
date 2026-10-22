@@ -695,10 +695,6 @@ function GeneralSettingsContent({
 	const [telemetryLoading, setTelemetryLoading] = useState(true);
 	const [telemetrySaving, setTelemetrySaving] = useState(false);
 	const [telemetryError, setTelemetryError] = useState<string | null>(null);
-	const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(true);
-	const [autoUpdateLoading, setAutoUpdateLoading] = useState(true);
-	const [autoUpdateSaving, setAutoUpdateSaving] = useState(false);
-	const [autoUpdateError, setAutoUpdateError] = useState<string | null>(null);
 
 	useEffect(() => setAppIconLocation(appIconSurface(navigator.userAgent)), []);
 	useEffect(() => subscribeToAppFontSize(setFontSize), []);
@@ -706,21 +702,16 @@ function GeneralSettingsContent({
 	const loadGlobalSettings = useCallback(async () => {
 		setTelemetryLoading(true);
 		setTelemetryError(null);
-		setAutoUpdateLoading(true);
-		setAutoUpdateError(null);
 		try {
 			const settings = await desktopClient.invoke<GlobalSettingsResponse>(
 				"get_global_settings",
 			);
 			setTelemetryOptOut(settings.telemetryOptOut);
-			setAutoUpdateEnabled(settings.autoUpdateEnabled);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			setTelemetryError(message);
-			setAutoUpdateError(message);
 		} finally {
 			setTelemetryLoading(false);
-			setAutoUpdateLoading(false);
 		}
 	}, []);
 
@@ -748,26 +739,6 @@ function GeneralSettingsContent({
 			setTelemetryError(message);
 		} finally {
 			setTelemetrySaving(false);
-		}
-	};
-
-	const updateAutoUpdateEnabled = async (nextValue: boolean) => {
-		const previousValue = autoUpdateEnabled;
-		setAutoUpdateEnabled(nextValue);
-		setAutoUpdateSaving(true);
-		setAutoUpdateError(null);
-		try {
-			const settings = await desktopClient.invoke<GlobalSettingsResponse>(
-				"set_auto_update_enabled",
-				{ auto_update_enabled: nextValue },
-			);
-			setAutoUpdateEnabled(settings.autoUpdateEnabled);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			setAutoUpdateEnabled(previousValue);
-			setAutoUpdateError(message);
-		} finally {
-			setAutoUpdateSaving(false);
 		}
 	};
 
@@ -817,7 +788,7 @@ function GeneralSettingsContent({
 	return (
 		<PageFrame>
 			<PageHeader
-				description="Manage desktop preferences for this browser and CLI environment."
+				description="Manage Segra Desktop preferences on this computer."
 				title="Settings"
 			/>
 			<section className="max-w-344">
@@ -957,29 +928,6 @@ function GeneralSettingsContent({
 							</button>
 						))}
 					</div>
-				</div>
-				<div className="flex py-4 items-center justify-between gap-5 border-b max-[720px]:flex-col max-[720px]:items-stretch max-[720px]:py-4">
-					<div className="flex flex-col gap-1">
-						<p className="text-base font-semibold text-foreground">
-							Keep CLI up to date
-						</p>
-						<p className="text-sm text-muted-foreground">
-							Automatically update the cline terminal command, which shares your
-							sessions and settings with this app. The app itself updates
-							separately.
-						</p>
-						{autoUpdateError ? (
-							<p className="mt-2 text-xs text-destructive" role="alert">
-								Failed to update CLI auto-update setting: {autoUpdateError}
-							</p>
-						) : null}
-					</div>
-					<Switch
-						aria-label="Keep CLI up to date"
-						checked={autoUpdateEnabled}
-						disabled={autoUpdateLoading || autoUpdateSaving}
-						onCheckedChange={(checked) => void updateAutoUpdateEnabled(checked)}
-					/>
 				</div>
 				<div className="flex py-4 items-center justify-between gap-5 border-b max-[720px]:flex-col max-[720px]:items-stretch max-[720px]:py-4">
 					<div className="flex flex-col gap-1">

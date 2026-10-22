@@ -81,12 +81,7 @@ import {
 import { preserveRoutineCron } from "@/lib/routine-schedule-cron";
 import { routineScheduleTimezone } from "@/lib/routine-schedule-timezone";
 import { cn } from "@/lib/utils";
-import {
-	CommandBadge,
-	PageEmptyState,
-	PageFrame,
-	PageHeader,
-} from "../page-layout";
+import { PageEmptyState, PageFrame, PageHeader } from "../page-layout";
 import { ROUTINE_TEMPLATES, type RoutineTemplate } from "./routine-templates";
 
 type DateTimeValue = number | string;
@@ -1179,7 +1174,6 @@ export function RoutineSchedulesContent({
 			<PageHeader
 				description="Run agents on cron schedules for recurring automations like daily summaries and code reviews."
 				title="Schedule"
-				meta={<CommandBadge>cline schedule</CommandBadge>}
 				actions={
 					<>
 						<Button

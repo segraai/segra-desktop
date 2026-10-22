@@ -43,6 +43,7 @@ import {
 	useState,
 } from "react";
 import { AppUpdateIndicator } from "@/components/app-update-indicator";
+import { SegraBalance } from "@/components/segra-balance";
 import { SegraLogo } from "@/components/segra-logo";
 import {
 	AlertDialog,
@@ -1014,14 +1015,6 @@ export function AgentSidebar({
 							<PanelLeftOpen className="size-4" />
 						</Button>
 					</div>
-				) : view === "settings" ? (
-					<div className="mt-5 min-h-0 flex-1 px-3">
-						<SettingsSectionNavigation
-							activeSection={settingsSection}
-							collapsed={false}
-							onSelect={openSettingsSection}
-						/>
-					</div>
 				) : (
 					<>
 						<div className="mt-5 shrink-0 pl-4 pr-2">
@@ -1209,6 +1202,21 @@ export function AgentSidebar({
 								</div>
 							</ScrollArea>
 						</div>
+						{/* Segra: the session list stays visible in Settings; the
+						    settings sections sit at the bottom, above the footer. */}
+						{view === "settings" &&
+						(SETTINGS_SECTIONS as readonly string[]).includes(
+							settingsSection,
+						) &&
+						settingsSection !== "Schedules" ? (
+							<div className="shrink-0 border-t border-sidebar-border px-3 pt-3 pb-1">
+								<SettingsSectionNavigation
+									activeSection={settingsSection}
+									collapsed={false}
+									onSelect={openSettingsSection}
+								/>
+							</div>
+						) : null}
 					</>
 				)}
 
@@ -1263,22 +1271,29 @@ export function AgentSidebar({
 							</Button>
 						</div>
 					) : (
-						<Button
-							aria-label="Settings"
-							className={cn(
-								"min-w-0 justify-start",
-								isCollapsed && "size-9 justify-center px-0",
-								view === "settings" &&
-									"bg-surface-hover text-sidebar-foreground",
-							)}
-							onClick={openSettings}
-							title="Settings"
-							type="button"
-							variant="sidebarItem"
-						>
-							<Settings className="size-4" />
-							{!isCollapsed ? "Settings" : null}
-						</Button>
+						<div className="flex min-w-0 items-center justify-between gap-2">
+							<Button
+								aria-label="Settings"
+								className={cn(
+									"min-w-0 justify-start",
+									// Leaves room for the Segra balance on the right.
+									!isCollapsed && "w-auto shrink-0",
+									isCollapsed && "size-9 justify-center px-0",
+									view === "settings" &&
+										"bg-surface-hover text-sidebar-foreground",
+								)}
+								onClick={openSettings}
+								title="Settings"
+								type="button"
+								variant="sidebarItem"
+							>
+								<Settings className="size-4" />
+								{!isCollapsed ? "Settings" : null}
+							</Button>
+							{!isCollapsed ? (
+								<SegraBalance className="min-w-0 pr-2 text-right" />
+							) : null}
+						</div>
 					)}
 				</div>
 			</div>

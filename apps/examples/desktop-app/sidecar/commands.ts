@@ -44,6 +44,7 @@ import {
 	getCoreBuiltinToolCatalog,
 	getLocalProviderModels,
 	getLocalTranscriptionModels,
+	getPersistedProviderApiKey,
 	getProviderAuthHandler,
 	identifyAccount,
 	isModelToolEnabledGlobally,
@@ -58,6 +59,7 @@ import {
 	readGlobalSettings,
 	resolveClineAccountTelemetryIdentity,
 	resolveMcpServerRegistration,
+	resolveSegraBaseUrl,
 	resolveSessionBackend,
 	resolveAgentConfigSearchPaths as resolveSharedAgentConfigSearchPaths,
 	SESSION_IMPORT_TOOLS,
@@ -2811,6 +2813,51 @@ export async function handleCommand(
 		}
 		syncAccountContextFromResult(ctx, manager, operation, result);
 		return result;
+	}
+
+	// ── Segra account ──────────────────────────────────────────────────
+	// The signed-in Segra user's balance, for the sidebar footer. Signed out
+	// or unreachable is a normal state: return null instead of throwing.
+	if (command === "segra_account") {
+		const manager = new ProviderSettingsManager();
+		const settings = manager.getProviderSettings("segra");
+		const apiKey = getPersistedProviderApiKey("segra", settings);
+		if (!apiKey) return { account: null };
+		try {
+			const response = await fetch(
+				`${resolveSegraBaseUrl(settings?.baseUrl)}/me`,
+				{
+					headers: { authorization: `Bearer ${apiKey}` },
+					signal: AbortSignal.timeout(10_000),
+				},
+			);
+			if (!response.ok) return { account: null };
+			return { account: await response.json() };
+		} catch {
+			return { account: null };
+		}
+	}
+
+	// Segra's model list with the signed-in user's access (which models are
+	// Pro, which this account can use), for the model picker. The provider's
+	// catalog only carries model ids.
+	if (command === "segra_models") {
+		const manager = new ProviderSettingsManager();
+		const settings = manager.getProviderSettings("segra");
+		const apiKey = getPersistedProviderApiKey("segra", settings);
+		try {
+			const response = await fetch(
+				`${resolveSegraBaseUrl(settings?.baseUrl)}/models`,
+				{
+					headers: apiKey ? { authorization: `Bearer ${apiKey}` } : {},
+					signal: AbortSignal.timeout(10_000),
+				},
+			);
+			if (!response.ok) return { catalog: null };
+			return { catalog: await response.json() };
+		} catch {
+			return { catalog: null };
+		}
 	}
 
 	// ── Cline integrations (GitHub App) ────────────────────────────────

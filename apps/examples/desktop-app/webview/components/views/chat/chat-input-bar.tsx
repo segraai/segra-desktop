@@ -46,7 +46,11 @@ import { toast } from "@/hooks/use-toast";
 import type { ChatSessionConfig, ChatSessionStatus } from "@/lib/chat-schema";
 import { imageFilesFromClipboard } from "@/lib/clipboard-images";
 import { cloudRepositoryLabel } from "@/lib/cloud-repositories";
-import { desktopClient, writeDesktopDebugLog } from "@/lib/desktop-client";
+import {
+	desktopClient,
+	openExternalUrl,
+	writeDesktopDebugLog,
+} from "@/lib/desktop-client";
 import {
 	buildModelPickerData,
 	type ModelPickerData,
@@ -72,6 +76,12 @@ import {
 	VOICE_INPUT_SETTINGS_CHANGED_EVENT,
 } from "@/lib/provider-model-catalog";
 import type { ProviderModel } from "@/lib/provider-schema";
+import {
+	applySegraAccess,
+	isLockedSegraModel,
+	SEGRA_PROVIDER_ID,
+	useSegraModelAccess,
+} from "@/lib/segra-models";
 import { startStreamingTranscription } from "@/lib/streaming-transcription";
 import { cn } from "@/lib/utils";
 import { PullRequestBar } from "./pull-request-bar";
@@ -1857,6 +1867,10 @@ const ModelSelector = memo(function ModelSelector({
 		() => visibleProviderModels[resolvedProvider] ?? [],
 		[resolvedProvider, visibleProviderModels],
 	);
+	// Segra: which models are Pro and which ones this account can use.
+	const segra = useSegraModelAccess(
+		!includeCloudModels && resolvedProvider === SEGRA_PROVIDER_ID,
+	);
 	// Sectioned picker data: display names plus the Recommended/Free tiers the
 	// SDK stamps onto cline/cline-pass models (ProviderModel.featured).
 	const pickerDataForProvider = useCallback(
@@ -1876,9 +1890,14 @@ const ModelSelector = memo(function ModelSelector({
 							value: entry.id,
 						})),
 					}
-				: buildModelPickerData(providerId, models);
+				: providerId === SEGRA_PROVIDER_ID
+					? applySegraAccess(
+							buildModelPickerData(providerId, models),
+							segra.access,
+						)
+					: buildModelPickerData(providerId, models);
 		},
-		[includeCloudModels, modelDetails, visibleProviderModels],
+		[includeCloudModels, modelDetails, segra.access, visibleProviderModels],
 	);
 	useEffect(() => {
 		const selected = modelDetails[normalizedProvider]?.find(
@@ -2203,11 +2222,47 @@ const ModelSelector = memo(function ModelSelector({
 	);
 	const handleModelSelect = useCallback(
 		(value: string) => {
+			// A Pro model on a free Segra account would only fail when sent:
+			// explain it and open the model guide instead of selecting it.
+			if (
+				resolvedProvider === SEGRA_PROVIDER_ID &&
+				isLockedSegraModel(segra.access, value)
+			) {
+				const name = segra.access?.byId.get(value)?.name ?? value;
+				toast({
+					title: `${name} is a Pro model`,
+					description:
+						"Pro models need a paid account. The model guide explains what each model is good at.",
+				});
+				if (segra.access?.modelsUrl)
+					void openExternalUrl(segra.access.modelsUrl);
+				return;
+			}
 			rememberSelection(resolvedProvider, value);
 			onModelChange(value);
 		},
-		[onModelChange, rememberSelection, resolvedProvider],
+		[onModelChange, rememberSelection, resolvedProvider, segra.access],
 	);
+	// A remembered or restored Pro model the account can't use (e.g. after a
+	// downgrade): fall back to the first model it can use.
+	useEffect(() => {
+		if (isBusy || resolvedProvider !== SEGRA_PROVIDER_ID) return;
+		if (!isLockedSegraModel(segra.access, model)) return;
+		const usable = modelPicker.options.find(
+			(option) => !isLockedSegraModel(segra.access, option.value),
+		);
+		if (!usable) return;
+		rememberSelection(resolvedProvider, usable.value);
+		onModelChange(usable.value);
+	}, [
+		isBusy,
+		model,
+		modelPicker,
+		onModelChange,
+		rememberSelection,
+		resolvedProvider,
+		segra.access,
+	]);
 	// The picker only lists providers with saved settings, so it is also the
 	// natural place to reach the rest of the catalog.
 	const providerOptions = useMemo(
@@ -2254,7 +2309,10 @@ const ModelSelector = memo(function ModelSelector({
 			className={triggerClassName}
 			disabled={isBusy || visibleModelPicker.options.length === 0}
 			emptyText="No models found."
-			onOpen={refreshActiveProviderModels}
+			onOpen={() => {
+				refreshActiveProviderModels();
+				if (resolvedProvider === SEGRA_PROVIDER_ID) segra.refresh();
+			}}
 			onValueChange={(value) => {
 				handleModelSelect(value);
 				if (closeMobileMenu) setMobileOpen(false);

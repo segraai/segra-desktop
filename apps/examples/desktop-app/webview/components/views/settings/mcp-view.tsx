@@ -55,7 +55,7 @@ import {
 	type MarketplaceLocalInstalledItemRenderContext,
 	MarketplaceView,
 } from "../marketplace-view";
-import { CommandBadge, PageFrame, PageHeader } from "../page-layout";
+import { PageFrame, PageHeader } from "../page-layout";
 import { subscribeToExtensionInventoryInvalidation } from "./extensions-view";
 
 type McpTransportType = "stdio" | "sse" | "streamableHttp";
@@ -774,7 +774,6 @@ export function McpServersContent({
 					title="MCP Servers"
 					meta={
 						<>
-							<CommandBadge>cline config mcp</CommandBadge>
 							<span className="rounded-md border border-border bg-background px-2 py-0.5 text-xs text-muted-foreground">
 								From settings file
 							</span>
