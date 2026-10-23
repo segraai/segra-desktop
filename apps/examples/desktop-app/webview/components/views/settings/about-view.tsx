@@ -175,6 +175,8 @@ function ReleaseNotes({
 }
 
 const SEGRA_SUPPORT_URL = "https://segra.ai";
+// The Segra web app, which hosts the privacy policy and terms.
+const SEGRA_WEB_URL = "https://web.segra.ai";
 const CLINE_REPO_URL = "https://github.com/cline/cline";
 
 /**
@@ -336,7 +338,7 @@ export function AboutContent({
 					<div className="flex shrink-0 gap-2">
 						<Button
 							onClick={() =>
-								void openExternalUrl(`${SEGRA_SUPPORT_URL}/privacy`)
+								void openExternalUrl(`${SEGRA_WEB_URL}/privacy`)
 							}
 							size="sm"
 							type="button"
@@ -345,7 +347,7 @@ export function AboutContent({
 							Privacy policy
 						</Button>
 						<Button
-							onClick={() => void openExternalUrl(`${SEGRA_SUPPORT_URL}/terms`)}
+							onClick={() => void openExternalUrl(`${SEGRA_WEB_URL}/terms`)}
 							size="sm"
 							type="button"
 							variant="outline"

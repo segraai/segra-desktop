@@ -19,6 +19,7 @@ import {
 	Import,
 	Info,
 	Loader2,
+	MessageSquare,
 	Mic,
 	Network,
 	PanelLeftOpen,
@@ -44,6 +45,7 @@ import {
 } from "react";
 import { AppUpdateIndicator } from "@/components/app-update-indicator";
 import { SegraBalance } from "@/components/segra-balance";
+import { SegraFeedbackDialog } from "@/components/segra-feedback-dialog";
 import { SegraLogo } from "@/components/segra-logo";
 import {
 	AlertDialog,
@@ -335,6 +337,7 @@ export function AgentSidebar({
 	// Segra: the bottom Settings list folds; remembered across launches.
 	// macOS draws its traffic lights over the title bar's left edge; elsewhere
 	// that space is free. Decided after mount so hydration matches.
+	const [feedbackOpen, setFeedbackOpen] = useState(false);
 	const [reserveTrafficLights, setReserveTrafficLights] = useState(true);
 	useEffect(() => {
 		setReserveTrafficLights(/Mac/i.test(navigator.userAgent));
@@ -1047,8 +1050,22 @@ export function AgentSidebar({
 									</Button>
 								))
 							: null}
+						<Button
+							aria-label="Send feedback"
+							onClick={() => setFeedbackOpen(true)}
+							title="Tell the Segra team what you think"
+							type="button"
+							variant="sidebarItem"
+						>
+							<MessageSquare className="size-4 shrink-0" />
+							<span className="truncate">Send feedback</span>
+						</Button>
 					</nav>
 				) : null}
+				<SegraFeedbackDialog
+					onOpenChange={setFeedbackOpen}
+					open={feedbackOpen}
+				/>
 
 				{isCollapsed ? (
 					<div className="mt-2 flex min-h-0 flex-1 flex-col items-start gap-1 px-1.5">

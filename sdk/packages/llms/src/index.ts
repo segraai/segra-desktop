@@ -148,9 +148,11 @@ export {
 	createCline,
 } from "./providers/vendors/cline";
 export {
+	checkSegraProvider,
 	SEGRA_DEFAULT_BASE_URL,
 	SEGRA_PROVIDER_ID,
 } from "./providers/vendors/segra";
+export type { SegraAttestation } from "./providers/vendors/segra-attest";
 export { LangfuseAttributesSpanProcessor } from "./services/LangfuseAttributesSpanProcessor";
 export {
 	disposeLangfuseTelemetry,

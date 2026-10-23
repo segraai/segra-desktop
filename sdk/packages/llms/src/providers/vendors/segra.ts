@@ -6,13 +6,22 @@
  * short-lived provider session (`POST {baseUrl}/session`), then sends the
  * request straight to that provider's endpoint, so prompts and code never pass
  * through Segra's server. Sessions are cached per model until shortly before
- * they expire. After each response the reply's TEE signature is checked
- * (segra-verify.ts) and the token counts and check result (never content) are
- * reported to `POST {baseUrl}/usage`.
+ * they expire. The server only does sign-in and billing: before the first
+ * prompt goes to a provider, this computer checks the provider itself (its 0G
+ * registration and hardware attestation, segra-attest.ts) and refuses to send
+ * anything if it doesn't pass. After each response the reply's TEE signature
+ * is checked against the key that check attested (segra-verify.ts), and the
+ * token counts and check result (never content) are reported to
+ * `POST {baseUrl}/usage`.
  */
 
 import { sha256 } from "@noble/hashes/sha2";
 import { bytesToHex } from "@noble/hashes/utils";
+import {
+	getSegraAttestation,
+	type QuoteVerifier,
+	type SegraAttestation,
+} from "./segra-attest";
 import {
 	recordSegraVerification,
 	type SegraVerificationStatus,
@@ -21,12 +30,12 @@ import {
 } from "./segra-verify";
 
 export const SEGRA_PROVIDER_ID = "segra";
-// Until the Segra API is deployed, the default is a local Segra server (`npm run dev` in 0g-api).
-// SEGRA_BASE_URL overrides it, e.g. for a staging server.
+// The deployed Segra server. SEGRA_BASE_URL overrides it: `bun run dev` in the desktop app
+// sets it to a local Segra server (`npm run dev` in segra-web), and it can point at staging.
 export const SEGRA_DEFAULT_BASE_URL =
 	(typeof process !== "undefined"
 		? process.env?.SEGRA_BASE_URL?.trim()
-		: undefined) || "http://localhost:3000/api/app/v1";
+		: undefined) || "https://web.segra.ai/api/app/v1";
 
 const SESSION_RENEW_MARGIN_MS = 60_000;
 
@@ -36,8 +45,6 @@ interface SegraSession {
 	model: string;
 	token: string;
 	expiresAt: number;
-	/** The provider's attested signing key; older Segra servers omit it. */
-	signer?: string;
 }
 
 type FetchWithOptionalPreconnect = typeof fetch & {
@@ -232,9 +239,41 @@ function readModel(body: string): string | undefined {
 	}
 }
 
+/**
+ * Mints a session for `model` and checks its provider on this computer (the
+ * app's "Verifying privacy" step before a chat's first message). The result is
+ * recorded, so the hub's own check before sending reuses a pass. Throws the
+ * server's message when no session can be minted (signed out, no credits…).
+ */
+export async function checkSegraProvider(input: {
+	apiKey: string;
+	model: string;
+	baseUrl?: string;
+	fetch?: typeof fetch;
+}): Promise<SegraAttestation> {
+	const baseFetch = input.fetch ?? fetch;
+	const baseUrl = trimTrailingSlashes(
+		input.baseUrl?.trim() || SEGRA_DEFAULT_BASE_URL,
+	);
+	const session = await getSession(
+		baseFetch,
+		baseUrl,
+		input.apiKey,
+		input.model,
+		false,
+	);
+	return getSegraAttestation({
+		fetch: baseFetch,
+		provider: session.provider,
+		endpoint: session.endpoint,
+		model: session.model,
+	});
+}
+
 export function createSegraFetch(
 	baseFetch: typeof fetch,
 	configuredBaseUrl: string | undefined,
+	options: { verifyQuote?: QuoteVerifier } = {},
 ): typeof fetch {
 	const baseUrl = trimTrailingSlashes(
 		configuredBaseUrl?.trim() || SEGRA_DEFAULT_BASE_URL,
@@ -273,6 +312,20 @@ export function createSegraFetch(
 				model,
 				renew,
 			);
+			// Checked on this computer, never taken from the Segra server.
+			const attestation = await getSegraAttestation({
+				fetch: baseFetch,
+				provider: session.provider,
+				endpoint: session.endpoint,
+				model: session.model,
+				verifyQuote: options.verifyQuote,
+			});
+			if (!attestation.trusted || !attestation.responseSigner) {
+				throw new SegraSessionError(
+					`Segra Desktop didn't send your message: it couldn't confirm that this provider runs the model inside secure hardware. ${attestation.verdict}`,
+					502,
+				);
+			}
 			const headers = new Headers(request.headers);
 			headers.set("authorization", `Bearer ${session.token}`);
 			// The server may resolve an alias ("default") to a concrete model.
@@ -284,7 +337,12 @@ export function createSegraFetch(
 				`${trimTrailingSlashes(session.endpoint)}${path}`,
 				{ method: "POST", headers, body: providerBody, signal: request.signal },
 			);
-			return { session, response, sentBody: providerBody };
+			return {
+				session,
+				response,
+				sentBody: providerBody,
+				signer: attestation.responseSigner,
+			};
 		};
 
 		let sent: Awaited<ReturnType<typeof send>>;
@@ -299,7 +357,7 @@ export function createSegraFetch(
 			throw error;
 		}
 
-		const { session, response, sentBody } = sent;
+		const { session, response, sentBody, signer } = sent;
 		if (!response.ok || !response.body) return response;
 		const isStream = (response.headers.get("content-type") ?? "").includes(
 			"text/event-stream",
@@ -315,7 +373,7 @@ export function createSegraFetch(
 					chatId,
 					model: session.model,
 					provider: session.provider,
-					expectedSigner: session.signer,
+					expectedSigner: signer,
 					requestSha256,
 					responseSha256,
 				});

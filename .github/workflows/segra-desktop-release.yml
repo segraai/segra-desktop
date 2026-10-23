@@ -14,8 +14,10 @@ name: segra-desktop-release
 #     apps refuse updates not signed with it.
 #   Optional, macOS: APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD,
 #     APPLE_SIGNING_IDENTITY, APPLE_API_KEY, APPLE_API_ISSUER,
-#     APPLE_API_KEY_CONTENT. Without them the app is unsigned (users
-#     right-click → Open the first time).
+#     APPLE_API_KEY_CONTENT. Without them the app is only ad-hoc signed
+#     (tauri.release.conf.json signingIdentity "-"; APPLE_SIGNING_IDENTITY
+#     overrides it): the first launch is blocked, then System Settings →
+#     Privacy & Security → Open Anyway.
 #   Optional, Windows: Authenticode signing is not wired up yet, so Windows
 #     builds are unsigned (SmartScreen → More info → Run anyway). Upstream's
 #     Azure Trusted Signing setup (desktop-publish.yml, tauri-sign-windows.ps1)

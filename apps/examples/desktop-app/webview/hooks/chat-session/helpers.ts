@@ -294,7 +294,7 @@ export function resolveCredentialFailureHint(
 }
 
 export type SegraBillingFailure = {
-	kind: "upgrade" | "waitlist" | "setting_up";
+	kind: "pro" | "waitlist" | "setting_up";
 	/** The button label, or null when the message itself says what to do. */
 	label: string | null;
 	/** Where the button goes: the link the Segra server put in the message. */
@@ -307,17 +307,17 @@ function linkAfter(description: string, pattern: RegExp): string | null {
 }
 
 /**
- * Recognizes the Segra server's account answers (lib/zg/billing.ts and
+ * Recognizes the Segra server's account answers (lib/zg/pro-requests.ts and
  * waitlist.ts in the Segra web app): used-up free credits (402) or a Pro
- * model on a free account (403), both "Upgrade at …"; no account yet (409
- * waitlist); a model still being set up (409). Returns null for anything else.
+ * model on a free account (403), both linking to the website's /pro page;
+ * no account yet (409 waitlist); a model still being set up (409). Returns
+ * null for anything else.
  */
 export function segraBillingFailure(
 	description: string,
 ): SegraBillingFailure | null {
-	const upgrade = linkAfter(description, /Upgrade at (https?:\/\/\S+)/i);
-	if (upgrade)
-		return { kind: "upgrade", label: "Upgrade to Pro", url: upgrade };
+	const pro = linkAfter(description, /(https?:\/\/\S+\/pro)(?![\w/-])/i);
+	if (pro) return { kind: "pro", label: "Try Pro", url: pro };
 	if (/priority waitlist/i.test(description)) {
 		return {
 			kind: "waitlist",

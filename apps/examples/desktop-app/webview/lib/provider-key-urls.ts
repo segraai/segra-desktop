@@ -5,7 +5,7 @@
  * to bring a key from. Everything else simply renders no link.
  */
 const PROVIDER_API_KEY_URLS: Record<string, string> = {
-	segra: "https://segra.ai",
+	segra: "https://web.segra.ai",
 	anthropic: "https://console.anthropic.com/settings/keys",
 	"openai-native": "https://platform.openai.com/api-keys",
 	openai: "https://platform.openai.com/api-keys",

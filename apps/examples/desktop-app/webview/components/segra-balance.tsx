@@ -5,16 +5,15 @@ import { desktopClient, openExternalUrl } from "@/lib/desktop-client";
 import { subscribeToProviderCatalogInvalidation } from "@/lib/provider-model-catalog";
 import { cn } from "@/lib/utils";
 
-// `GET {segra}/me`, as relayed by the sidecar's `segra_account` command.
-type SegraAccount =
-	| { billing: "legacy"; userId: string; creditBalanceUsd: number }
-	| {
-			billing: "wallet";
-			userId: string;
-			tier?: "free" | "paid";
-			credits: number;
-			status: "ok" | "setting_up" | "empty";
-	  };
+// `GET {segra}/me`, as relayed by the sidecar's `segra_account` command. Every
+// Segra account has its own wallet and a balance in credits.
+type SegraAccount = {
+	billing?: "wallet";
+	userId: string;
+	tier?: "free" | "paid";
+	credits: number;
+	status: "ok" | "setting_up" | "empty";
+};
 
 const REFRESH_MS = 30_000;
 const AFTER_TURN_MS = 3_000;
@@ -27,15 +26,6 @@ const formatCredits = (n: number) =>
 	n.toLocaleString(undefined, { maximumFractionDigits: n < 10 ? 2 : 0 });
 
 function balanceLine(account: SegraAccount): { text: string; low: boolean } {
-	if (account.billing === "legacy") {
-		const low = account.creditBalanceUsd <= 0;
-		return {
-			low,
-			text: low
-				? "Out of credits"
-				: `$${account.creditBalanceUsd.toFixed(2)} credits left`,
-		};
-	}
 	if (account.status === "setting_up")
 		return { low: false, text: "Setting up your account…" };
 	if (account.status === "empty") return { low: true, text: "Balance used up" };
@@ -45,20 +35,22 @@ function balanceLine(account: SegraAccount): { text: string; low: boolean } {
 /** The signed-in Segra account's balance; renders nothing when signed out. */
 export function SegraBalance({ className }: { className?: string }) {
 	const [account, setAccount] = useState<SegraAccount | null>(null);
-	const [billingUrl, setBillingUrl] = useState<string | null>(null);
+	const [proUrl, setProUrl] = useState<string | null>(null);
 
 	useEffect(() => {
 		let cancelled = false;
 		const load = () => {
 			// No visibility check: WebKitGTK can report a shown window as hidden.
 			desktopClient
-				.invoke<{ account: SegraAccount | null; billingUrl?: string }>(
+				.invoke<{ account: SegraAccount | null; proUrl?: string }>(
 					"segra_account",
 				)
 				.then((result) => {
 					if (cancelled) return;
-					setAccount(result?.account ?? null);
-					setBillingUrl(result?.billingUrl ?? null);
+					// Anything without a credit balance isn't shown.
+					const next = result?.account;
+					setAccount(typeof next?.credits === "number" ? next : null);
+					setProUrl(result?.proUrl ?? null);
 				})
 				.catch(() => undefined);
 		};
@@ -89,11 +81,8 @@ export function SegraBalance({ className }: { className?: string }) {
 
 	if (!account) return null;
 	const { text, low } = balanceLine(account);
-	// Free accounts can upgrade to Pro (more so once their credits run out).
-	const action =
-		billingUrl && account.billing === "wallet" && account.tier === "free"
-			? "Upgrade"
-			: null;
+	// Free accounts can ask for credits to try Pro (more so once theirs run out).
+	const action = proUrl && account.tier === "free" ? "Try Pro" : null;
 	return (
 		<span
 			className={cn(
@@ -110,10 +99,10 @@ export function SegraBalance({ className }: { className?: string }) {
 			>
 				{text}
 			</span>
-			{action && billingUrl ? (
+			{action && proUrl ? (
 				<button
 					className="shrink-0 font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					onClick={() => void openExternalUrl(billingUrl)}
+					onClick={() => void openExternalUrl(proUrl)}
 					type="button"
 				>
 					{action}

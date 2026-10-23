@@ -9,7 +9,7 @@
 		"dev:sidecar": "bun run sidecar/index.ts",
 		"predev:headless": "bun run build:ui",
 		"dev:headless": "bun run scripts/dev-headless.ts",
-		"dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
+		"dev": "SEGRA_BASE_URL=${SEGRA_BASE_URL:-http://localhost:3000/api/app/v1} tauri dev --config src-tauri/tauri.dev.conf.json",
 		"prebuild:web": "bun run build:ui",
 		"build:web": "next build webview",
 		"prebuild": "bun run build:ui",

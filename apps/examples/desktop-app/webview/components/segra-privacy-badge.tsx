@@ -24,9 +24,11 @@ export interface SegraVerification {
 	checkedAt: number;
 }
 
+/** The provider check this computer ran before sending it anything (segra-attest.ts). */
 interface Attestation {
-	allPassed: boolean;
-	verifiedAt: number;
+	trusted: boolean;
+	verdict: string;
+	checkedAt: number;
 	checks: { id: string; label: string; status: string }[];
 }
 
@@ -56,7 +58,7 @@ function badgeFor(latest: SegraVerification | undefined) {
 			label: "Verified",
 			tone: "text-primary",
 			summary:
-				"The last reply was signed inside the model's attested secure enclave (TEE), over exactly the reply this computer received.",
+				"This computer checked the provider's secure hardware (TEE) itself, and the last reply was signed inside it, over exactly the reply received.",
 		};
 	}
 	if (latest.status === "failed") {
@@ -173,32 +175,38 @@ export function SegraPrivacyBadge({ model }: { model: string }) {
 				) : null}
 				{latest ? (
 					<div className="mt-3 border-t pt-3 text-xs">
-						<p className="font-medium">Provider attestation</p>
+						<p className="font-medium">Provider check, on this computer</p>
 						{attestation === "loading" ? (
-							<p className="mt-1 text-muted-foreground">Checking…</p>
+							<p className="mt-1 text-muted-foreground">Loading…</p>
 						) : attestation ? (
 							<>
 								<p
 									className={cn(
 										"mt-1",
-										attestation.allPassed ? "text-primary" : "text-destructive",
+										attestation.trusted ? "text-primary" : "text-destructive",
 									)}
 								>
-									{attestation.allPassed
-										? "All hardware checks passed."
-										: "Some hardware checks did not pass."}
+									{attestation.trusted
+										? `All checks passed at ${new Date(attestation.checkedAt).toLocaleTimeString()}, before anything was sent.`
+										: attestation.verdict}
 								</p>
 								<ul className="mt-1 space-y-0.5 text-muted-foreground">
-									{attestation.checks.slice(0, 8).map((check) => (
+									{attestation.checks.slice(0, 12).map((check) => (
 										<li key={check.id}>
-											{check.status === "pass" ? "✓" : "•"} {check.label}
+											{check.status === "pass"
+												? "✓"
+												: check.status === "fail"
+													? "✗"
+													: "•"}{" "}
+											{check.label}
 										</li>
 									))}
 								</ul>
 							</>
 						) : (
 							<p className="mt-1 text-muted-foreground">
-								Couldn't load the attestation right now.
+								Not checked yet: it runs before the first message to this
+								provider.
 							</p>
 						)}
 					</div>

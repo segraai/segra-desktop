@@ -270,7 +270,7 @@ function ConnectStep({
 				By signing in you agree to the{" "}
 				<button
 					className="underline underline-offset-2 hover:text-foreground"
-					onClick={() => void openExternalUrl("https://segra.ai/terms")}
+					onClick={() => void openExternalUrl("https://web.segra.ai/terms")}
 					type="button"
 				>
 					terms
@@ -278,7 +278,7 @@ function ConnectStep({
 				and{" "}
 				<button
 					className="underline underline-offset-2 hover:text-foreground"
-					onClick={() => void openExternalUrl("https://segra.ai/privacy")}
+					onClick={() => void openExternalUrl("https://web.segra.ai/privacy")}
 					type="button"
 				>
 					privacy policy

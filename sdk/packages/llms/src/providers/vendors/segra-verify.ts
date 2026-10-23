@@ -3,8 +3,9 @@
  *
  * Each 0G TEE provider signs `sha256(request):sha256(response)` for every chat
  * with a key that only exists inside its attested enclave, and publishes the
- * signature at `{endpoint}/signature/{chatId}`. The Segra server tells us which
- * key that is when it mints the session (`signer`). Recovering the signer from
+ * signature at `{endpoint}/signature/{chatId}`. Which key that is comes from
+ * this computer's own check of the provider (segra-attest.ts), never from the
+ * Segra server. Recovering the signer from
  * the signature and comparing hashes of the bytes this machine actually sent
  * and received shows the reply was produced inside that TEE, unmodified.
  *
@@ -106,7 +107,7 @@ export async function verifySegraReply(
 		return {
 			...base,
 			status: "unavailable",
-			error: "The Segra server did not name the provider's signing key.",
+			error: "No attested signing key for this provider.",
 		};
 	}
 

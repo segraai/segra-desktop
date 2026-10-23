@@ -34,6 +34,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SpeechInput } from "@/components/ai-elements/speech-input";
 import { FILES_DROPPED_EVENT } from "@/components/file-drop-guard";
 import { SegraPrivacyBadge } from "@/components/segra-privacy-badge";
+import { useSegraPrivacyCheck } from "@/components/segra-privacy-check";
 import {
 	Select,
 	SelectContent,
@@ -592,6 +593,8 @@ function ChatInputBarImpl({
 			steeringPromptRef.current = false;
 		}
 	};
+	const segraPrivacyCheck = useSegraPrivacyCheck();
+	const runSegraPrivacyCheck = segraPrivacyCheck.run;
 	const handleSend = useCallback(() => {
 		if (speechInputActive || readOnly) return;
 		if (unsupportedDraftImageCount > 0) {
@@ -609,8 +612,26 @@ function ChatInputBarImpl({
 			return;
 		}
 		setPromptInput("");
+		// A new Segra chat first shows this computer checking the provider
+		// ("Verifying privacy"); a failed check keeps the message unsent.
+		if (
+			provider === SEGRA_PROVIDER_ID &&
+			model &&
+			!hasActiveSession &&
+			executionTarget === "local"
+		) {
+			void runSegraPrivacyCheck(model).then((ok) =>
+				ok ? onSend(prompt) : setPromptInput(prompt),
+			);
+			return;
+		}
 		onSend(prompt);
 	}, [
+		provider,
+		model,
+		hasActiveSession,
+		executionTarget,
+		runSegraPrivacyCheck,
 		needsCloudRepository,
 		needsCloudModel,
 		readOnly,
@@ -1693,6 +1714,7 @@ function ChatInputBarImpl({
 					) : null}
 				</AgentComposerSettingsEnd>
 			</AgentComposerSettings>
+			{segraPrivacyCheck.overlay}
 		</AgentComposer>
 	);
 }
@@ -2236,10 +2258,10 @@ const ModelSelector = memo(function ModelSelector({
 				toast({
 					title: `${name} is a Pro model`,
 					description:
-						"Pro models need a Pro account. You can upgrade on the Segra website.",
+						"While Segra is in testing, you can ask for free credits to try Pro models on the Segra website.",
 				});
-				const upgradeUrl = segra.access?.billingUrl ?? segra.access?.modelsUrl;
-				if (upgradeUrl) void openExternalUrl(upgradeUrl);
+				const proUrl = segra.access?.proUrl ?? segra.access?.modelsUrl;
+				if (proUrl) void openExternalUrl(proUrl);
 				return;
 			}
 			rememberSelection(resolvedProvider, value);

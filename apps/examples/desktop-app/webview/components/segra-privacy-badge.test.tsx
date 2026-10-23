@@ -93,6 +93,47 @@ describe("SegraPrivacyBadge", () => {
 		);
 	});
 
+	it("shows the provider check this computer ran", async () => {
+		invoke.mockImplementation(async (command: string) =>
+			command === "segra_verifications"
+				? { entries: [entry("0GM", "verified")] }
+				: {
+						attestation: {
+							trusted: false,
+							verdict: "Failed: Where the model runs.",
+							checkedAt: 1,
+							checks: [
+								{
+									id: "registration",
+									label: "Provider registered on 0G",
+									status: "pass",
+								},
+								{
+									id: "where-model-runs",
+									label: "Where the model runs",
+									status: "fail",
+								},
+							],
+						},
+					},
+		);
+		await act(async () => {
+			root.render(<SegraPrivacyBadge model="0GM" />);
+		});
+		await act(async () => {});
+		await act(async () => {
+			container.querySelector("button")?.click();
+		});
+		await act(async () => {});
+		expect(invoke).toHaveBeenCalledWith("segra_attestation", {
+			provider: "0xprovider",
+		});
+		const text = document.body.textContent ?? "";
+		expect(text).toContain("Provider check, on this computer");
+		expect(text).toContain("Failed: Where the model runs.");
+		expect(text).toContain("✗ Where the model runs");
+	});
+
 	it("explains that checks start with the first reply", async () => {
 		expect(await renderFor("0GM", [])).toBe("Privacy: Private");
 	});

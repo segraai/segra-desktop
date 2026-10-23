@@ -1140,6 +1140,7 @@ describe("AgentSidebar session organization", () => {
 			"Session",
 			"Schedule",
 			"Customize",
+			"Send feedback",
 		]);
 		for (const row of rows) {
 			expect(row.className).toContain("w-full");

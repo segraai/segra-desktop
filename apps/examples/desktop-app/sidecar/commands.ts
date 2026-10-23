@@ -74,7 +74,10 @@ import {
 	updateMcpSettingsFileSync,
 	upgradeManagedHub,
 } from "@cline/core";
-import { resolveAudioTranscriptionRoute } from "@cline/llms";
+import {
+	checkSegraProvider,
+	resolveAudioTranscriptionRoute,
+} from "@cline/llms";
 import {
 	CLINE_DEFAULT_MODEL_ID,
 	formatSessionSearchPreview,
@@ -93,7 +96,10 @@ import {
 import packageJson from "../package.json";
 import { CLINE_ACCOUNT_NOT_AUTHENTICATED_RESULT } from "../webview/lib/cline-account-state";
 import { MAX_RECORDED_AUDIO_BYTES } from "../webview/lib/voice-input-limits";
-import { resolveDesktopTelemetryUser } from "./client-context";
+import {
+	DESKTOP_CLIENT_CONTEXT,
+	resolveDesktopTelemetryUser,
+} from "./client-context";
 import {
 	getCloudSessionManager,
 	resetCloudSessionManager,
@@ -2787,9 +2793,9 @@ export async function handleCommand(
 				},
 			);
 			if (!response.ok) return { account: null };
-			// Top up / upgrade live on the Segra website, at the API's origin.
-			const billingUrl = `${new URL(resolveSegraBaseUrl(settings?.baseUrl)).origin}/billing`;
-			return { account: await response.json(), billingUrl };
+			// Free Pro credits are requested on the Segra website, at the API's origin.
+			const proUrl = `${new URL(resolveSegraBaseUrl(settings?.baseUrl)).origin}/pro`;
+			return { account: await response.json(), proUrl };
 		} catch {
 			return { account: null };
 		}
@@ -2815,6 +2821,43 @@ export async function handleCommand(
 		} catch {
 			return { catalog: null };
 		}
+	}
+
+	// The Send feedback box: { action: "list" } returns the user's sent messages;
+	// { action: "send", message } sends one to the Segra team.
+	if (command === "segra_feedback") {
+		const settings = new ProviderSettingsManager().getProviderSettings("segra");
+		const apiKey = getPersistedProviderApiKey("segra", settings);
+		if (!apiKey) return { signedIn: false, messages: [] };
+		const url = `${resolveSegraBaseUrl(settings?.baseUrl)}/feedback`;
+		const headers = {
+			authorization: `Bearer ${apiKey}`,
+			"content-type": "application/json",
+		};
+		const send = String(args?.action ?? "") === "send";
+		const response = await fetch(url, {
+			method: send ? "POST" : "GET",
+			headers,
+			body: send
+				? JSON.stringify({
+						message: String(args?.message ?? ""),
+						app: "Segra Desktop",
+						version: DESKTOP_CLIENT_CONTEXT.version,
+					})
+				: undefined,
+			signal: AbortSignal.timeout(15_000),
+		});
+		const body = (await response.json().catch(() => ({}))) as {
+			error?: string;
+			messages?: unknown[];
+		};
+		if (!response.ok) {
+			throw new Error(
+				body.error ?? `Feedback failed (HTTP ${response.status}).`,
+			);
+		}
+		if (send) return { signedIn: true, sent: body };
+		return { signedIn: true, messages: body.messages ?? [] };
 	}
 
 	// Per-reply TEE signature checks, newest first. The Segra provider runs in
@@ -2847,19 +2890,46 @@ export async function handleCommand(
 		}
 	}
 
-	// The provider's TEE attestation, as checked by the Segra server (public).
-	if (command === "segra_attestation") {
-		const provider = String(args?.provider ?? "").trim();
-		if (!provider) return { attestation: null };
+	// The composer's "Verifying privacy" step before a chat's first message:
+	// checks the model's provider on this computer now (recorded, so the hub
+	// reuses the pass). `error` means no session could be minted (signed out,
+	// no credits…); the app then sends anyway and the reply shows that error.
+	if (command === "segra_check_provider") {
+		const model = String(args?.model ?? "").trim();
 		const settings = new ProviderSettingsManager().getProviderSettings("segra");
+		const apiKey = getPersistedProviderApiKey("segra", settings);
+		if (!model || !apiKey) return { attestation: null, error: "not signed in" };
 		try {
-			const origin = new URL(resolveSegraBaseUrl(settings?.baseUrl)).origin;
-			const response = await fetch(
-				`${origin}/api/zg/attestation?provider=${encodeURIComponent(provider)}`,
-				{ signal: AbortSignal.timeout(30_000) },
-			);
-			if (!response.ok) return { attestation: null };
-			return { attestation: await response.json() };
+			const attestation = await checkSegraProvider({
+				apiKey,
+				model,
+				baseUrl: resolveSegraBaseUrl(settings?.baseUrl),
+			});
+			return { attestation };
+		} catch (error) {
+			return {
+				attestation: null,
+				error: error instanceof Error ? error.message : String(error),
+			};
+		}
+	}
+
+	// The provider's TEE attestation, as checked on this computer before the
+	// first prompt went to it (segra-attest.ts in @cline/llms, which runs in the
+	// hub and records the latest result per provider). Never the server's.
+	if (command === "segra_attestation") {
+		const provider = String(args?.provider ?? "")
+			.trim()
+			.toLowerCase();
+		if (!provider) return { attestation: null };
+		try {
+			const entries = JSON.parse(
+				readFileSync(
+					join(resolveClineDataDir(), "segra", "attestations.json"),
+					"utf8",
+				),
+			) as Record<string, unknown>;
+			return { attestation: entries?.[provider] ?? null };
 		} catch {
 			return { attestation: null };
 		}

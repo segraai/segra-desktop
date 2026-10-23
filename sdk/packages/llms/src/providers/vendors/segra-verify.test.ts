@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createSegraFetch } from "./segra";
+import { getSegraAttestation } from "./segra-attest";
 import {
 	recoverPersonalSignAddress,
 	sha256Hex,
@@ -18,6 +19,9 @@ const SIGNATURE =
 	"0x3b897e00c17faec5d75c2e493865bf5e2d6c9458aec4e41e423f0cd05c0af55f6a339eb5ec23f45cf09ddc0b50d2267bd3096a2b2e734cc592d24f559074f1801c";
 
 const noSleep = async () => {};
+
+// The provider check itself is tested in segra-attest.test.ts.
+vi.mock("./segra-attest", () => ({ getSegraAttestation: vi.fn() }));
 
 function signatureFetch(body: unknown, status = 200) {
 	return vi.fn(
@@ -143,7 +147,8 @@ describe("createSegraFetch verification", () => {
 						model: "m",
 						token: "t",
 						expiresAt: Date.now() + 15 * 60_000,
-						signer: SIGNER,
+						// Old servers sent a signer; it must be ignored.
+						signer: "0x000000000000000000000000000000000000dead",
 					});
 				}
 				if (href.includes("/signature/")) {
@@ -166,6 +171,17 @@ describe("createSegraFetch verification", () => {
 			},
 		) as unknown as typeof fetch;
 
+		vi.mocked(getSegraAttestation).mockResolvedValue({
+			provider: "0xprovider",
+			model: "m",
+			url: "https://provider.example",
+			architecture: "model-in-tee",
+			trusted: true,
+			verdict: "ok",
+			responseSigner: SIGNER,
+			checks: [],
+			checkedAt: 0,
+		});
 		const segraFetch = createSegraFetch(
 			baseFetch,
 			"https://segra.example/api/app/v1",
@@ -198,7 +214,12 @@ describe("createSegraFetch verification", () => {
 			const recorded = JSON.parse(
 				readFileSync(join(dataDir, "segra", "verifications.json"), "utf8"),
 			);
-			expect(recorded[0]).toMatchObject({ chatId: "chat-9", status: "failed" });
+			// Checked against the key this computer attested, not the server's.
+			expect(recorded[0]).toMatchObject({
+				chatId: "chat-9",
+				status: "failed",
+				expectedSigner: SIGNER,
+			});
 			expect(JSON.stringify(recorded)).not.toContain("choices");
 		});
 	});

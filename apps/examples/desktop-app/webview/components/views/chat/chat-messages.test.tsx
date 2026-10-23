@@ -2559,7 +2559,7 @@ describe("ChatMessages Segra billing failures", () => {
 					sessionId: "session-1",
 					role: "error",
 					content:
-						"The run failed: glm-5.3 is a Pro model. Upgrade at https://segra.ai/billing to use it; your account can use 0GM-1.0-35B-A3B. What each model is good at: https://segra.ai/models.",
+						"The run failed: glm-5.3 is a Pro model. Ask for free credits to try it at https://segra.ai/pro; your account can use 0GM-1.0-35B-A3B. What each model is good at: https://segra.ai/models.",
 					createdAt: 2,
 					meta: { providerId: "segra" },
 				},
@@ -2572,7 +2572,7 @@ describe("ChatMessages Segra billing failures", () => {
 		const labels = [...(bubble?.querySelectorAll("button") ?? [])].map(
 			(button) => button.textContent,
 		);
-		expect(labels).toContain("Upgrade to Pro");
+		expect(labels).toContain("Try Pro");
 		expect(labels).not.toContain("Sign in to Segra");
 	});
 });

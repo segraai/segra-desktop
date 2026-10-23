@@ -319,30 +319,23 @@ describe("extractAssistantTurnDataFromRpcMessages", () => {
 describe("segraBillingFailure", () => {
 	const origin = "https://segra.ai";
 	it("recognizes each Segra account answer and keeps its link", () => {
+		const tryPro = { kind: "pro", label: "Try Pro", url: `${origin}/pro` };
 		expect(
 			segraBillingFailure(
-				`The run failed: Your free credits are used up. Upgrade at ${origin}/billing to keep going.`,
+				`The run failed: Your free credits are used up. Ask for free credits to try Pro at ${origin}/pro.`,
 			),
-		).toEqual({
-			kind: "upgrade",
-			label: "Upgrade to Pro",
-			url: `${origin}/billing`,
-		});
+		).toEqual(tryPro);
+		expect(
+			segraBillingFailure(
+				`glm-5.3 is a Pro model. Ask for free credits to try it at ${origin}/pro; your account can use 0GM. What each model is good at: ${origin}/models.`,
+			),
+		).toEqual(tryPro);
 		// A Pro account out of credits gets a plain message, no button.
 		expect(
 			segraBillingFailure(
 				"Your balance is used up. Contact the Segra team to add more.",
 			),
 		).toBeNull();
-		expect(
-			segraBillingFailure(
-				`glm-5.3 is a Pro model. Upgrade at ${origin}/billing to use it; your account can use 0GM. What each model is good at: ${origin}/models.`,
-			),
-		).toEqual({
-			kind: "upgrade",
-			label: "Upgrade to Pro",
-			url: `${origin}/billing`,
-		});
 		expect(
 			segraBillingFailure(
 				`Demand is high right now, so we can't get you in yet. Join the priority waitlist and we'll let you know as soon as your account is ready. ${origin}/waitlist`,
@@ -358,10 +351,14 @@ describe("segraBillingFailure", () => {
 			),
 		).toEqual({ kind: "setting_up", label: null, url: null });
 		expect(segraBillingFailure("maximum context tokens exceeded")).toBeNull();
+		// A provider URL that merely starts with /pro is not the Pro page.
+		expect(
+			segraBillingFailure("fetch failed: https://p.example/proxy/v1"),
+		).toBeNull();
 	});
 
 	it("keeps a Pro-model 403 from reading as a sign-in problem", () => {
-		const proLock = `403 Forbidden: glm-5.3 is a Pro model. Upgrade at ${origin}/billing to use it.`;
+		const proLock = `403 Forbidden: glm-5.3 is a Pro model. Ask for free credits to try it at ${origin}/pro.`;
 		expect(isCredentialFailure(proLock)).toBe(false);
 		expect(isCredentialFailure("401 Unauthorized")).toBe(true);
 	});

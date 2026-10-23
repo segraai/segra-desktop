@@ -1,5 +1,26 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createSegraFetch } from "./segra";
+import { getSegraAttestation } from "./segra-attest";
+
+// The provider check (0G registration + hardware quote) has its own tests in
+// segra-attest.test.ts; here it passes unless a test says otherwise.
+vi.mock("./segra-attest", () => ({ getSegraAttestation: vi.fn() }));
+const attest = vi.mocked(getSegraAttestation);
+const TRUSTED = {
+	provider: "0xprovider",
+	model: "m",
+	url: "https://provider.test",
+	architecture: "model-in-tee" as const,
+	trusted: true,
+	verdict: "The model runs inside attested secure hardware.",
+	responseSigner: "0x0000000000000000000000000000000000000001",
+	checks: [],
+	checkedAt: 0,
+};
+beforeEach(() => {
+	attest.mockReset();
+	attest.mockResolvedValue(TRUSTED);
+});
 
 const BASE = "https://segra.test/api/app/v1";
 const KEY = "sk-segra-test";
@@ -33,6 +54,10 @@ function fakeServer(options: { providerStatus?: number[] } = {}) {
 				});
 			}
 			if (url === `${BASE}/usage`) return new Response(null, { status: 204 });
+			if (url.includes("/signature/")) {
+				// A dummy signature: the reply check fails without retrying.
+				return Response.json({ text: "a:b", signature: "0x00" });
+			}
 			if (url.startsWith("https://provider.test/")) {
 				const status = providerStatus.shift() ?? 200;
 				if (status !== 200) return new Response("unauthorized", { status });
@@ -98,7 +123,7 @@ describe("createSegraFetch", () => {
 			chatId: "chat-1",
 			inputTokens: 12,
 			outputTokens: 3,
-			verification: "unavailable",
+			verification: "failed",
 		});
 	});
 
@@ -148,6 +173,33 @@ describe("createSegraFetch", () => {
 				code: 402,
 			},
 		});
+	});
+
+	it("never sends the prompt to a provider that fails the local check", async () => {
+		attest.mockResolvedValue({
+			...TRUSTED,
+			trusted: false,
+			responseSigner: null,
+			verdict: "Failed: Where the model runs.",
+		});
+		const server = fakeServer();
+		const segraFetch = createSegraFetch(server.fetchImpl as never, BASE);
+		const response = await chat(segraFetch, "glm-5", "sk-segra-f");
+		expect(response.status).toBe(502);
+		expect((await response.json()).error.message).toContain(
+			"didn't send your message",
+		);
+		expect(
+			server.calls.some((c) => c.url.startsWith("https://provider.test/")),
+		).toBe(false);
+		// The check gets the server's claims to compare against 0G, nothing more.
+		expect(attest).toHaveBeenCalledWith(
+			expect.objectContaining({
+				provider: "0xprovider",
+				endpoint: "https://provider.test/v1/proxy",
+				model: "glm-5",
+			}),
+		);
 	});
 
 	it("asks for a key when none is configured", async () => {

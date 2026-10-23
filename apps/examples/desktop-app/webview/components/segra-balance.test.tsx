@@ -42,7 +42,7 @@ describe("SegraBalance", () => {
 	async function renderWith(account: Record<string, unknown>) {
 		invoke.mockResolvedValue({
 			account,
-			billingUrl: "https://segra.ai/billing",
+			proUrl: "https://segra.ai/pro",
 		});
 		await act(async () => {
 			root.render(<SegraBalance />);
@@ -55,7 +55,7 @@ describe("SegraBalance", () => {
 			(candidate) => candidate.textContent === label,
 		);
 
-	it("offers an upgrade when free credits are used up", async () => {
+	it("offers Try Pro when free credits are used up", async () => {
 		await renderWith({
 			billing: "wallet",
 			userId: "u",
@@ -64,11 +64,11 @@ describe("SegraBalance", () => {
 			status: "empty",
 		});
 		expect(container.textContent).toContain("Balance used up");
-		await act(async () => button("Upgrade")?.click());
-		expect(openExternalUrl).toHaveBeenCalledWith("https://segra.ai/billing");
+		await act(async () => button("Try Pro")?.click());
+		expect(openExternalUrl).toHaveBeenCalledWith("https://segra.ai/pro");
 	});
 
-	it("offers an upgrade on a free account with credits left", async () => {
+	it("offers Try Pro on a free account with credits left", async () => {
 		await renderWith({
 			billing: "wallet",
 			userId: "u",
@@ -77,7 +77,7 @@ describe("SegraBalance", () => {
 			status: "ok",
 		});
 		expect(container.textContent).toContain("120 credits left");
-		expect(button("Upgrade")).toBeDefined();
+		expect(button("Try Pro")).toBeDefined();
 	});
 
 	it("shows only the balance on a Pro account, even when used up", async () => {
@@ -89,5 +89,14 @@ describe("SegraBalance", () => {
 			status: "empty",
 		});
 		expect(container.querySelector("button")).toBeNull();
+	});
+
+	it("shows nothing for an account without a credit balance", async () => {
+		await renderWith({
+			billing: "legacy",
+			userId: "u",
+			creditBalanceUsd: 5,
+		} as never);
+		expect(container.textContent).toBe("");
 	});
 });
