@@ -297,7 +297,7 @@ jobs:
             Segra Desktop v${{ needs.validate.outputs.version }}
 
             Download the installer for your computer:
-            - macOS: `${{ env.PRODUCT_PREFIX }}_${{ needs.validate.outputs.version }}_universal.dmg`. If macOS says the app can't be opened, right-click it and choose Open.
+            - macOS: `${{ env.PRODUCT_PREFIX }}_${{ needs.validate.outputs.version }}_universal.dmg`. If macOS blocks the first launch, open System Settings → Privacy & Security and choose Open Anyway.
             - Windows: `${{ env.PRODUCT_PREFIX }}_${{ needs.validate.outputs.version }}_x64-setup.exe`. If SmartScreen warns, choose More info → Run anyway.
             - Linux: the `.deb` (Debian, Ubuntu) or `.rpm` (Fedora).
 
