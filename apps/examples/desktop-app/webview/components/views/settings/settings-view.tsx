@@ -62,7 +62,6 @@ import {
 } from "../marketplace-explorer-view";
 import { PageFrame, PageHeader } from "../page-layout";
 import { AboutContent } from "./about-view";
-import { AccountView } from "./account-view";
 import { AddProviderContent, type AddProviderPayload } from "./add-provider";
 import { ChannelsContent } from "./channels-view";
 import { CustomizeView } from "./customize-view";
@@ -531,9 +530,11 @@ export function SettingsView({
 		>
 			<DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
 				<DialogHeader>
-					<DialogTitle>Add Provider</DialogTitle>
+					<DialogTitle>Add custom endpoint</DialogTitle>
 					<DialogDescription>
-						Add an OpenAI-compatible provider and choose its available models.
+						Connect any OpenAI-compatible API and choose its models. Your
+						prompts and code go to this endpoint, so it's only private if you
+						run or trust the infrastructure behind it.
 					</DialogDescription>
 				</DialogHeader>
 				<AddProviderContent
@@ -630,8 +631,6 @@ export function SettingsView({
 			<ImportContent />
 		) : activeNav === "Remote" ? (
 			<RemoteEnvironmentsContent />
-		) : activeNav === "Account" ? (
-			<AccountView />
 		) : activeNav === "About" ? (
 			<AboutContent onOpenConnectors={() => onNavigateSection("Customize")} />
 		) : activeNav === "General" ? (

@@ -15,9 +15,6 @@ const OPTIONAL_SECRET_ENV_VARS = [
 	"ERROR_SERVICE_API_KEY",
 ] as const;
 
-/** Optional build-time overrides for packaged dogfood builds. */
-const OPTIONAL_FEATURE_ENV_VARS = ["CLINE_CODE_CLOUD_AGENTS"] as const;
-
 /**
  * Every env var `getTelemetryBuildTimeConfig` reads
  * (sdk/packages/shared/src/services/telemetry-config.ts), plus the trace
@@ -45,23 +42,17 @@ const OTEL_ENV_VARS = [
  * `["--define", 'process.env.OTEL_TELEMETRY_ENABLED="1"', ...]`.
  */
 export function telemetryDefineArgs(
-	env: Record<string, string | undefined> = process.env,
+	_env: Record<string, string | undefined> = process.env,
 ): string[] {
 	const args: string[] = [];
 	const define = (name: string, value: string) => {
 		args.push("--define", `process.env.${name}=${JSON.stringify(value)}`);
 	};
-	for (const name of [
-		...OPTIONAL_SECRET_ENV_VARS,
-		...OPTIONAL_FEATURE_ENV_VARS,
-	]) {
-		const value = env[name];
-		if (value) {
-			define(name, value);
-		}
-	}
-	for (const name of OTEL_ENV_VARS) {
-		define(name, env[name] ?? "");
+	// Segra Desktop: telemetry keys and OTEL settings always inline as "", so
+	// a packaged build can never report to Cline (or anyone) even when the
+	// build machine has these set.
+	for (const name of [...OPTIONAL_SECRET_ENV_VARS, ...OTEL_ENV_VARS]) {
+		define(name, "");
 	}
 	return args;
 }

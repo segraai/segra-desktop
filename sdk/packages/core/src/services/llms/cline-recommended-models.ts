@@ -6,6 +6,7 @@ import {
 } from "@cline/llms";
 import {
 	getClineEnvironmentConfig,
+	isClineCloudDisabled,
 	type ProviderModel,
 	type ProviderModelFeaturedTier,
 } from "@cline/shared";
@@ -261,6 +262,7 @@ export async function fetchClineRecommendedModels(
 	// promise resolves on a microtask, ahead of the zero-delay timer.
 	const deadline = Date.now() + timeoutMs;
 	try {
+		if (isClineCloudDisabled()) throw new Error("Cline cloud is disabled");
 		const base = getConfiguredApiBaseUrl(options);
 		const fetchImpl = options.fetchImpl ?? fetch;
 		const resp = await fetchWithTimeout(

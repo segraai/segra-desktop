@@ -1,15 +1,12 @@
 import type { ProviderSettingsManager } from "@cline/core";
 import {
-	completeClineDeviceAuth,
 	completeSegraDeviceAuth,
 	getProviderAuthStorageId,
 	loginLocalProvider,
 	markLocalProviderEnabled,
 	saveLocalProviderOAuthCredentials,
-	startClineDeviceAuth,
 	startSegraDeviceAuth,
 } from "@cline/core";
-import { getClineEnvironmentConfig } from "@cline/shared";
 
 export class OAuthLoginCancelledError extends Error {
 	constructor(providerId: string) {
@@ -70,19 +67,8 @@ async function loginProviderForDesktop(
 	if (providerId !== "cline" && providerId !== "cline-pass") {
 		return loginLocalProvider(providerId, existing, openUrl);
 	}
-	const device = await startClineDeviceAuth({ signal });
-	signal?.throwIfAborted();
-	onUserCode?.(device.userCode);
-	openUrl(device.verificationUriComplete ?? device.verificationUri);
-	return completeClineDeviceAuth({
-		signal,
-		deviceCode: device.deviceCode,
-		expiresInSeconds: device.expiresInSeconds,
-		pollIntervalSeconds: device.pollIntervalSeconds,
-		apiBaseUrl:
-			existing?.baseUrl?.trim() || getClineEnvironmentConfig().apiBaseUrl,
-		provider: providerId,
-	});
+	// Segra Desktop: Cline accounts are not offered.
+	throw new Error("Cline sign-in isn't available in Segra Desktop.");
 }
 
 const defaultDependencies: OAuthLoginDependencies = {

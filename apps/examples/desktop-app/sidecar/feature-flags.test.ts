@@ -104,27 +104,12 @@ afterEach(() => {
 });
 
 describe("getDesktopFeatureFlagsService", () => {
-	it("uses PostHog when the build-time key is inlined", () => {
+	it("never uses PostHog, even with a build-time key", () => {
 		process.env.TELEMETRY_SERVICE_API_KEY = "phc_key";
-		getDesktopFeatureFlagsService();
-		expect(mocks.PostHogFeatureFlagsProvider).toHaveBeenCalledTimes(1);
-		expect(mocks.buildClinePostHogClient).toHaveBeenCalledWith("phc_key");
-		expect(mocks.NoOpFeatureFlagsProvider).not.toHaveBeenCalled();
-	});
-
-	it("falls back to the no-op provider when no key was inlined", () => {
-		delete process.env.TELEMETRY_SERVICE_API_KEY;
 		getDesktopFeatureFlagsService();
 		expect(mocks.NoOpFeatureFlagsProvider).toHaveBeenCalledTimes(1);
 		expect(mocks.PostHogFeatureFlagsProvider).not.toHaveBeenCalled();
-	});
-
-	it("never calls PostHog under IS_TEST even with a key present", () => {
-		process.env.TELEMETRY_SERVICE_API_KEY = "phc_key";
-		process.env.IS_TEST = "true";
-		getDesktopFeatureFlagsService();
-		expect(mocks.NoOpFeatureFlagsProvider).toHaveBeenCalledTimes(1);
-		expect(mocks.PostHogFeatureFlagsProvider).not.toHaveBeenCalled();
+		expect(mocks.buildClinePostHogClient).not.toHaveBeenCalled();
 	});
 
 	it("returns one shared instance so the core and the webview agree", () => {
@@ -132,7 +117,7 @@ describe("getDesktopFeatureFlagsService", () => {
 		expect(getDesktopFeatureFlagsService()).toBe(
 			getDesktopFeatureFlagsService(),
 		);
-		expect(mocks.PostHogFeatureFlagsProvider).toHaveBeenCalledTimes(1);
+		expect(mocks.NoOpFeatureFlagsProvider).toHaveBeenCalledTimes(1);
 	});
 });
 
@@ -323,7 +308,7 @@ describe("disposeDesktopFeatureFlagsService", () => {
 
 		// A later call builds a fresh service rather than reusing a disposed one.
 		getDesktopFeatureFlagsService();
-		expect(mocks.PostHogFeatureFlagsProvider).toHaveBeenCalledTimes(2);
+		expect(mocks.NoOpFeatureFlagsProvider).toHaveBeenCalledTimes(2);
 	});
 
 	it("is a no-op when nothing was created", async () => {
@@ -333,38 +318,14 @@ describe("disposeDesktopFeatureFlagsService", () => {
 });
 
 describe("cloud agents gate", () => {
-	beforeEach(() => {
+	afterEach(() => {
 		delete process.env.CLINE_CODE_CLOUD_AGENTS;
 	});
 
-	it("is disabled while the rollout flag is off", async () => {
+	it("stays off even when the flag or the env override says on", async () => {
 		const { isCloudAgentsEnabled } = await import("./feature-flags");
-		expect(isCloudAgentsEnabled()).toBe(false);
-	});
-
-	it("does not enable a boolean rollout from a truthy variant payload", async () => {
-		const { isCloudAgentsEnabled } = await import("./feature-flags");
-		mocks.getFlagPayload.mockReturnValue("control");
-		expect(isCloudAgentsEnabled()).toBe(false);
-		expect(mocks.getBooleanFlagEnabled).toHaveBeenCalledWith(
-			"code-cloud-agents",
-		);
-	});
-
-	it("is enabled by the rollout flag alone", async () => {
-		const { isCloudAgentsEnabled } = await import("./feature-flags");
-		mocks.getBooleanFlagEnabled.mockImplementation(
-			(flag: unknown) => flag === "code-cloud-agents",
-		);
-		expect(isCloudAgentsEnabled()).toBe(true);
-	});
-
-	it("lets the env override force the gate in both directions", async () => {
-		const { isCloudAgentsEnabled } = await import("./feature-flags");
-		mocks.getFlagPayload.mockReturnValue(undefined);
+		mocks.getBooleanFlagEnabled.mockReturnValue(true);
 		process.env.CLINE_CODE_CLOUD_AGENTS = "1";
-		expect(isCloudAgentsEnabled()).toBe(true);
-		process.env.CLINE_CODE_CLOUD_AGENTS = "0";
 		expect(isCloudAgentsEnabled()).toBe(false);
 	});
 });

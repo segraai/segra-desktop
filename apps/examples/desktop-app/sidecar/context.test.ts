@@ -431,96 +431,6 @@ describe("Code sidecar runtime capabilities", () => {
 		}
 	});
 
-	it("includes a cold cloud session in title search", async () => {
-		const { handleCommand } = await import("./commands");
-		const { createSidecarContext } = await import("./context");
-		const ctx = createSidecarContext("/workspace/project");
-		const list = vi.fn(async () => [
-			cloudSearchRecord("cloud-cold", "UNIQUE-CLOUD-TITLE"),
-		]);
-		ctx.runtimeBindings.set("local", {
-			environmentId: "local",
-			kind: "local",
-			workspaceRoot: "/workspace/project",
-			hubClient: {
-				command: vi.fn(async () => ({ ok: true, payload: { hits: [] } })),
-			} as never,
-			sessionManager: { list: vi.fn(async () => []) } as never,
-			unsubscribeSessionEvents: () => {},
-		});
-		ctx.cloudSessionManager = createSearchCloudManager(ctx, list);
-
-		const results = (await handleCommand(ctx, "search_sessions", {
-			query: "UNIQUE-CLOUD-TITLE",
-		})) as Array<{ sessionId: string }>;
-
-		expect(results).toEqual([
-			expect.objectContaining({ sessionId: "cloud-cold" }),
-		]);
-	});
-
-	it("appends unique cloud hits after indexed local hits and applies the limit", async () => {
-		const { handleCommand } = await import("./commands");
-		const { createSidecarContext } = await import("./context");
-		const ctx = createSidecarContext("/workspace/project");
-		ctx.runtimeBindings.set("local", {
-			environmentId: "local",
-			kind: "local",
-			workspaceRoot: "/workspace/project",
-			hubClient: {
-				command: vi.fn(async () => ({
-					ok: true,
-					payload: {
-						hits: [
-							{
-								sessionId: "local-1",
-								documentId: "local-1:0",
-								role: "user",
-								title: "match",
-								snippet: "match",
-							},
-							{
-								sessionId: "shared",
-								documentId: "shared:0",
-								role: "user",
-								title: "match",
-								snippet: "match",
-							},
-							{
-								sessionId: "shared",
-								documentId: "shared:1",
-								role: "assistant",
-								title: "match",
-								snippet: "match again",
-							},
-						],
-					},
-				})),
-			} as never,
-			sessionManager: { list: vi.fn(async () => []) } as never,
-			unsubscribeSessionEvents: () => {},
-		});
-		ctx.cloudSessionManager = createSearchCloudManager(ctx, async () => [
-			cloudSearchRecord("shared", "match"),
-			cloudSearchRecord("cloud-2", "match second", "2026-01-03T00:00:00.000Z"),
-			cloudSearchRecord("cloud-3", "match third", "2026-01-02T00:00:00.000Z"),
-		]);
-
-		const results = (await handleCommand(ctx, "search_sessions", {
-			query: "match",
-			limit: 4,
-		})) as Array<{ sessionId: string; documentId: string }>;
-
-		expect(
-			results.map(({ sessionId, documentId }) => [sessionId, documentId]),
-		).toEqual([
-			["local-1", "local-1:0"],
-			["shared", "shared:0"],
-			["shared", "shared:1"],
-			["cloud-2", "cloud-2:metadata"],
-		]);
-	});
-
 	it("preserves local fallback results when cloud discovery times out", async () => {
 		vi.useFakeTimers();
 		try {
@@ -561,38 +471,6 @@ describe("Code sidecar runtime capabilities", () => {
 		} finally {
 			vi.useRealTimers();
 		}
-	});
-
-	it("does not append results from a manager replaced during search", async () => {
-		const { handleCommand } = await import("./commands");
-		const { createSidecarContext } = await import("./context");
-		const ctx = createSidecarContext("/workspace/project");
-		let release!: (records: CloudSessionRecord[]) => void;
-		ctx.runtimeBindings.set("local", {
-			environmentId: "local",
-			kind: "local",
-			workspaceRoot: "/workspace/project",
-			hubClient: {
-				command: vi.fn(async () => ({ ok: true, payload: { hits: [] } })),
-			} as never,
-			sessionManager: { list: vi.fn(async () => []) } as never,
-			unsubscribeSessionEvents: () => {},
-		});
-		ctx.cloudSessionManager = createSearchCloudManager(
-			ctx,
-			() =>
-				new Promise((resolve) => {
-					release = resolve;
-				}),
-		);
-		const pending = handleCommand(ctx, "search_sessions", {
-			query: "stale cloud",
-		}) as Promise<unknown[]>;
-		await vi.waitFor(() => expect(release).toBeTypeOf("function"));
-		ctx.cloudSessionManager = null;
-		release([cloudSearchRecord("stale-cloud", "stale cloud")]);
-
-		await expect(pending).resolves.toEqual([]);
 	});
 
 	it("forwards raw hub tool updates to attached desktop sessions", async () => {

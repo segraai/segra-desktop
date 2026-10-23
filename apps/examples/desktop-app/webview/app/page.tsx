@@ -1014,9 +1014,6 @@ export default function Home() {
 											onOpenModelSettings={() =>
 												handleSettingsSectionChange("Providers")
 											}
-											onOpenAccountSettings={() =>
-												handleSettingsSectionChange("Account")
-											}
 											parentSession={activeParentSession}
 											onThreadStarted={handleThreadStarted}
 										/>
@@ -1122,7 +1119,6 @@ function ChatThreadPane({
 	onOpenSessionById,
 	onOpenSetup,
 	onOpenModelSettings,
-	onOpenAccountSettings,
 	onPickRemoteWorkspaceDirectory,
 	onSelectEnvironment,
 	parentSession,
@@ -1160,7 +1156,6 @@ function ChatThreadPane({
 	onSelectEnvironment: (environmentId: string) => Promise<void>;
 	onOpenSetup?: () => void;
 	onOpenModelSettings?: () => void;
-	onOpenAccountSettings?: () => void;
 	parentSession?: { sessionId: string; title?: string };
 	remoteEnvironment: RemoteWorkspaceEnvironment | null;
 	onThreadStarted?: (threadId: string, sessionId?: string) => void;
@@ -2034,15 +2029,12 @@ function ChatThreadPane({
 		const result = await forkSession();
 		openForkedSession(result);
 	}, [forkSession, openForkedSession]);
+	// Segra Desktop has no Cline account; every credentials fix is in Providers.
 	const handleFixCredentials = useCallback(
-		(target: "account" | "models") => {
-			if (target === "account") {
-				onOpenAccountSettings?.();
-			} else {
-				onOpenModelSettings?.();
-			}
+		(_target: "account" | "models") => {
+			onOpenModelSettings?.();
 		},
-		[onOpenAccountSettings, onOpenModelSettings],
+		[onOpenModelSettings],
 	);
 
 	const handleEditMessage = useCallback(

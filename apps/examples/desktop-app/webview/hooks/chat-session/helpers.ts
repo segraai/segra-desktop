@@ -293,6 +293,44 @@ export function resolveCredentialFailureHint(
 	return "Check your model connection in Settings → Providers (or sign in with Segra), then try again.";
 }
 
+export type SegraBillingFailure = {
+	kind: "upgrade" | "waitlist" | "setting_up";
+	/** The button label, or null when the message itself says what to do. */
+	label: string | null;
+	/** Where the button goes: the link the Segra server put in the message. */
+	url: string | null;
+};
+
+function linkAfter(description: string, pattern: RegExp): string | null {
+	const match = description.match(pattern);
+	return match?.[1] ? match[1].replace(/[.,;:)]+$/, "") : null;
+}
+
+/**
+ * Recognizes the Segra server's account answers (lib/zg/billing.ts and
+ * waitlist.ts in the Segra web app): used-up free credits (402) or a Pro
+ * model on a free account (403), both "Upgrade at …"; no account yet (409
+ * waitlist); a model still being set up (409). Returns null for anything else.
+ */
+export function segraBillingFailure(
+	description: string,
+): SegraBillingFailure | null {
+	const upgrade = linkAfter(description, /Upgrade at (https?:\/\/\S+)/i);
+	if (upgrade)
+		return { kind: "upgrade", label: "Upgrade to Pro", url: upgrade };
+	if (/priority waitlist/i.test(description)) {
+		return {
+			kind: "waitlist",
+			label: "Join the waitlist",
+			url: linkAfter(description, /(https?:\/\/\S+\/waitlist)/i),
+		};
+	}
+	if (/(Setting up|Topping up) .*Try again in a minute/i.test(description)) {
+		return { kind: "setting_up", label: null, url: null };
+	}
+	return null;
+}
+
 /**
  * Whether a failure message describes a credential problem. Deliberately
  * avoids matching a bare "token": provider failures like "maximum context
@@ -300,6 +338,9 @@ export function resolveCredentialFailureHint(
  * must not point users at their provider settings.
  */
 export function isCredentialFailure(description: string): boolean {
+	// Segra's balance, Pro and waitlist answers (402/403/409) are not sign-in
+	// problems; they get their own action instead.
+	if (segraBillingFailure(description)) return false;
 	return /unauthorized|401|403|forbidden|api key|credential|authenticat|sign in|auth token|access token|invalid token|expired token|token expired|session expired|not logged in|\/login/i.test(
 		description,
 	);

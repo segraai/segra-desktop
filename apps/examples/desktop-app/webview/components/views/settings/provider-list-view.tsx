@@ -22,10 +22,13 @@ import {
 	PlusCircle,
 	RefreshCw,
 	Search,
+	ShieldAlert,
+	ShieldCheck,
 	Star,
 	X,
 } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { SegraLogo } from "@/components/segra-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useOAuthUserCode } from "@/hooks/use-oauth-user-code";
@@ -47,6 +50,7 @@ import type {
 	ProviderModel,
 	ProviderSettingsUpdate,
 } from "@/lib/provider-schema";
+import { SEGRA_PROVIDER_ID } from "@/lib/segra-models";
 import { cn } from "@/lib/utils";
 import { AudioModelBadges } from "./audio-model-badges";
 
@@ -267,6 +271,66 @@ function ProviderSection({
 	);
 }
 
+/**
+ * Segra Desktop: Segra is the recommended provider, shown as its own card
+ * above the folded list of other providers.
+ */
+function SegraProviderCard({
+	provider,
+	onConfigure,
+	selected,
+}: {
+	provider: Provider;
+	onConfigure: (id: string) => void;
+	selected: boolean;
+}) {
+	const connected = isProviderConnected(provider);
+	return (
+		<section
+			aria-label="Segra"
+			className={cn(
+				"rounded-xl border-2 border-primary/40 bg-primary/5 p-5",
+				selected && "border-primary",
+			)}
+		>
+			<div className="flex items-start gap-4">
+				<SegraLogo className="size-12" />
+				<div className="min-w-0 flex-1">
+					<div className="flex flex-wrap items-center gap-2">
+						<h2 className="text-xl font-semibold text-foreground">Segra</h2>
+						<span className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
+							<ShieldCheck aria-hidden="true" className="size-3" />
+							Private
+						</span>
+						{connected ? (
+							<span className="text-xs font-medium text-muted-foreground">
+								Signed in
+							</span>
+						) : null}
+					</div>
+					<p className="mt-2 text-sm leading-6 text-foreground">
+						The recommended way to use Segra Desktop. Your prompts, code and
+						files go straight from this computer to a model running inside a
+						verified secure enclave. Segra never sees them, and neither does the
+						company running the hardware.
+					</p>
+				</div>
+			</div>
+			<div className="mt-4 flex justify-end">
+				<Button
+					className="h-8 px-3 text-sm"
+					onClick={() => onConfigure(provider.id)}
+					type="button"
+					variant={connected ? "outline" : "default"}
+				>
+					{connected ? "Models and account" : "Sign in to Segra"}
+					<ChevronRight className="size-4" />
+				</Button>
+			</div>
+		</section>
+	);
+}
+
 export function ProviderListContent({
 	providers,
 	onConfigure,
@@ -294,14 +358,32 @@ export function ProviderListContent({
 	};
 	const isPanel = variant === "panel";
 
+	const segraProvider = providers.find(
+		(provider) => provider.id === SEGRA_PROVIDER_ID,
+	);
+	const otherProviderList = providers.filter(
+		(provider) => provider.id !== SEGRA_PROVIDER_ID,
+	);
+	// Other providers start folded, unless there is no Segra card or one of
+	// them is already in use or open.
+	const [othersOpen, setOthersOpen] = useState(
+		() =>
+			!segraProvider ||
+			otherProviderList.some(
+				(provider) =>
+					isProviderConnected(provider) || provider.id === selectedProviderId,
+			),
+	);
+	const othersContentId = useId();
+
 	const providerSearchQuery = providerSearch.trim().toLowerCase();
 	const filteredProviders = providerSearchQuery
-		? providers.filter(
+		? otherProviderList.filter(
 				(provider) =>
 					provider.name.toLowerCase().includes(providerSearchQuery) ||
 					provider.id.toLowerCase().includes(providerSearchQuery),
 			)
-		: providers;
+		: otherProviderList;
 
 	const connectedProviders = filteredProviders.filter(isProviderConnected);
 	const availableProviders = filteredProviders.filter(
@@ -315,7 +397,8 @@ export function ProviderListContent({
 	const otherProviders = availableProviders.filter(
 		(provider) => !provider.capabilities?.includes("popular"),
 	);
-	const connectedCount = providers.filter(isProviderConnected).length;
+	const otherConnectedCount =
+		otherProviderList.filter(isProviderConnected).length;
 
 	const renderRows = (entries: Provider[]) => (
 		<div className="overflow-hidden border-t">
@@ -338,62 +421,21 @@ export function ProviderListContent({
 			)}
 		>
 			<div
-				className={cn(
-					"mb-6 flex shrink-0 items-start justify-between gap-6 max-[860px]:flex-col max-[860px]:items-stretch",
-					isPanel ? "max-w-none" : "max-w-2xl",
-				)}
-			>
-				<div className="min-w-0">
-					<h1
-						className={cn(
-							"truncate font-semibold leading-[1.15] text-foreground",
-							isPanel ? "text-2xl" : "text-3xl",
-						)}
-					>
-						Model Providers
-					</h1>
-					<p className="mt-3 text-base leading-6 text-muted-foreground">
-						{connectedCount === 0
-							? "Connect a provider to start using models."
-							: `${connectedCount} configured · ${providers.length} available`}
-					</p>
-				</div>
-				<Button
-					className="h-8 shrink-0 rounded-md bg-foreground px-3 text-sm text-background hover:bg-foreground/90 max-[860px]:self-start"
-					onClick={onAddProvider}
-					type="button"
-				>
-					<PlusCircle className="size-4" />
-					Add provider
-				</Button>
-			</div>
-
-			<div
 				className={cn("mb-6 shrink-0", isPanel ? "max-w-none" : "max-w-2xl")}
 			>
-				<div className="flex h-9 items-center gap-2 rounded border bg-background px-3">
-					<Search className="size-4 shrink-0 text-muted-foreground" />
-					<Input
-						aria-label="Search model providers"
-						className={EMBEDDED_INPUT_CLASS}
-						onChange={(event) => {
-							setProviderSearch(event.target.value);
-							setCollapsedSections(new Set());
-						}}
-						placeholder="Search providers"
-						value={providerSearch}
-					/>
-					{providerSearch ? (
-						<button
-							aria-label="Clear provider search"
-							className="grid size-5 place-items-center rounded text-muted-foreground hover:text-foreground"
-							onClick={() => setProviderSearch("")}
-							type="button"
-						>
-							<X className="size-3.5" />
-						</button>
-					) : null}
-				</div>
+				<h1
+					className={cn(
+						"truncate font-semibold leading-[1.15] text-foreground",
+						isPanel ? "text-2xl" : "text-3xl",
+					)}
+				>
+					Model Providers
+				</h1>
+				<p className="mt-3 text-base leading-6 text-muted-foreground">
+					{segraProvider
+						? "Segra keeps your work private. Other providers are optional."
+						: "Connect a provider to start using models."}
+				</p>
 			</div>
 
 			<section
@@ -405,46 +447,135 @@ export function ProviderListContent({
 				// biome-ignore lint/a11y/noNoninteractiveTabindex: Allow keyboard scrolling of the provider list.
 				tabIndex={0}
 			>
-				{filteredProviders.length === 0 ? (
-					<div className="border-y px-2 py-6 text-base text-muted-foreground">
-						No providers match "{providerSearch.trim()}".
+				{segraProvider ? (
+					<SegraProviderCard
+						onConfigure={onConfigure}
+						provider={segraProvider}
+						selected={selectedProviderId === segraProvider.id}
+					/>
+				) : null}
+
+				<button
+					aria-controls={othersContentId}
+					aria-expanded={othersOpen}
+					className={cn(
+						"flex w-full items-center gap-2 rounded text-left text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+						segraProvider && "mt-6",
+					)}
+					onClick={() => setOthersOpen((open) => !open)}
+					type="button"
+				>
+					<ChevronRight
+						aria-hidden="true"
+						className={cn(
+							"size-4 shrink-0 transition-transform",
+							othersOpen && "rotate-90",
+						)}
+					/>
+					Other providers
+					<span className="text-xs">
+						{otherConnectedCount > 0
+							? `${otherConnectedCount} configured`
+							: "not private"}
+					</span>
+				</button>
+
+				<div className="mt-4" hidden={!othersOpen} id={othersContentId}>
+					<div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
+						<div className="flex items-start gap-3">
+							<ShieldAlert
+								aria-hidden="true"
+								className="mt-0.5 size-5 shrink-0 text-amber-600 dark:text-amber-400"
+							/>
+							<div className="min-w-0 text-sm leading-6">
+								<p className="font-medium text-foreground">
+									These providers can't guarantee privacy.
+								</p>
+								<p className="mt-1 text-muted-foreground">
+									Your prompts, code and files are sent to their servers and
+									handled under their own terms. Segra can't check what happens
+									to them there. If you need privacy outside Segra, run a model
+									on infrastructure you control and add it as a custom endpoint
+									(any OpenAI-compatible API).
+								</p>
+								<Button
+									className="mt-3 h-8 px-3 text-sm"
+									onClick={onAddProvider}
+									type="button"
+									variant="outline"
+								>
+									<PlusCircle className="size-4" />
+									Add custom endpoint
+								</Button>
+							</div>
+						</div>
 					</div>
-				) : null}
 
-				{connectedProviders.length > 0 ? (
-					<ProviderSection
-						title="Configured"
-						expanded={!collapsedSections.has("Configured")}
-						onToggle={() => toggleSection("Configured")}
-					>
-						{renderRows(connectedProviders)}
-					</ProviderSection>
-				) : null}
+					<div className="mb-6 flex h-9 items-center gap-2 rounded border bg-background px-3">
+						<Search className="size-4 shrink-0 text-muted-foreground" />
+						<Input
+							aria-label="Search model providers"
+							className={EMBEDDED_INPUT_CLASS}
+							onChange={(event) => {
+								setProviderSearch(event.target.value);
+								setCollapsedSections(new Set());
+							}}
+							placeholder="Search providers"
+							value={providerSearch}
+						/>
+						{providerSearch ? (
+							<button
+								aria-label="Clear provider search"
+								className="grid size-5 place-items-center rounded text-muted-foreground hover:text-foreground"
+								onClick={() => setProviderSearch("")}
+								type="button"
+							>
+								<X className="size-3.5" />
+							</button>
+						) : null}
+					</div>
 
-				{popularProviders.length > 0 ? (
-					<ProviderSection
-						expanded={!collapsedSections.has("Popular")}
-						onToggle={() => toggleSection("Popular")}
-						description={
-							connectedProviders.length === 0 && !providerSearchQuery
-								? "Sign in or add an API key to connect."
-								: undefined
-						}
-						title="Popular"
-					>
-						{renderRows(popularProviders)}
-					</ProviderSection>
-				) : null}
+					{filteredProviders.length === 0 ? (
+						<div className="border-y px-2 py-6 text-base text-muted-foreground">
+							No providers match "{providerSearch.trim()}".
+						</div>
+					) : null}
 
-				{otherProviders.length > 0 ? (
-					<ProviderSection
-						title="All providers"
-						expanded={!collapsedSections.has("All providers")}
-						onToggle={() => toggleSection("All providers")}
-					>
-						{renderRows(otherProviders)}
-					</ProviderSection>
-				) : null}
+					{connectedProviders.length > 0 ? (
+						<ProviderSection
+							title="Configured"
+							expanded={!collapsedSections.has("Configured")}
+							onToggle={() => toggleSection("Configured")}
+						>
+							{renderRows(connectedProviders)}
+						</ProviderSection>
+					) : null}
+
+					{popularProviders.length > 0 ? (
+						<ProviderSection
+							expanded={!collapsedSections.has("Popular")}
+							onToggle={() => toggleSection("Popular")}
+							description={
+								connectedProviders.length === 0 && !providerSearchQuery
+									? "Sign in or add an API key to connect."
+									: undefined
+							}
+							title="Popular"
+						>
+							{renderRows(popularProviders)}
+						</ProviderSection>
+					) : null}
+
+					{otherProviders.length > 0 ? (
+						<ProviderSection
+							title="All providers"
+							expanded={!collapsedSections.has("All providers")}
+							onToggle={() => toggleSection("All providers")}
+						>
+							{renderRows(otherProviders)}
+						</ProviderSection>
+					) : null}
+				</div>
 			</section>
 		</div>
 	);

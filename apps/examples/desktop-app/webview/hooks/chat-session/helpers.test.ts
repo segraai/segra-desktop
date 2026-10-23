@@ -3,9 +3,11 @@ import type { ChatSessionConfig } from "@/lib/chat-schema";
 import {
 	extractAssistantTurnDataFromRpcMessages,
 	inferHydratedChatStatus,
+	isCredentialFailure,
 	resolveCredentialError,
 	resolveCredentialFailureAction,
 	resolveCredentialFailureHint,
+	segraBillingFailure,
 } from "./helpers";
 
 const CLOUD_CONFIG: ChatSessionConfig = {
@@ -311,5 +313,56 @@ describe("extractAssistantTurnDataFromRpcMessages", () => {
 			images: [],
 			media: [],
 		});
+	});
+});
+
+describe("segraBillingFailure", () => {
+	const origin = "https://segra.ai";
+	it("recognizes each Segra account answer and keeps its link", () => {
+		expect(
+			segraBillingFailure(
+				`The run failed: Your free credits are used up. Upgrade at ${origin}/billing to keep going.`,
+			),
+		).toEqual({
+			kind: "upgrade",
+			label: "Upgrade to Pro",
+			url: `${origin}/billing`,
+		});
+		// A Pro account out of credits gets a plain message, no button.
+		expect(
+			segraBillingFailure(
+				"Your balance is used up. Contact the Segra team to add more.",
+			),
+		).toBeNull();
+		expect(
+			segraBillingFailure(
+				`glm-5.3 is a Pro model. Upgrade at ${origin}/billing to use it; your account can use 0GM. What each model is good at: ${origin}/models.`,
+			),
+		).toEqual({
+			kind: "upgrade",
+			label: "Upgrade to Pro",
+			url: `${origin}/billing`,
+		});
+		expect(
+			segraBillingFailure(
+				`Demand is high right now, so we can't get you in yet. Join the priority waitlist and we'll let you know as soon as your account is ready. ${origin}/waitlist`,
+			),
+		).toEqual({
+			kind: "waitlist",
+			label: "Join the waitlist",
+			url: `${origin}/waitlist`,
+		});
+		expect(
+			segraBillingFailure(
+				"Setting up glm-5.3 for your account. Try again in a minute.",
+			),
+		).toEqual({ kind: "setting_up", label: null, url: null });
+		expect(segraBillingFailure("maximum context tokens exceeded")).toBeNull();
+	});
+
+	it("keeps a Pro-model 403 from reading as a sign-in problem", () => {
+		const proLock = `403 Forbidden: glm-5.3 is a Pro model. Upgrade at ${origin}/billing to use it.`;
+		expect(isCredentialFailure(proLock)).toBe(false);
+		expect(isCredentialFailure("401 Unauthorized")).toBe(true);
 	});
 });

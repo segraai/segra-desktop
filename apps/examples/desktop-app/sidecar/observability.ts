@@ -30,10 +30,13 @@ export function createDesktopObservability(): DesktopObservability {
 	const logger = loggerAdapter.core;
 	setSdkLogger(logger);
 
+	// Segra Desktop sends no telemetry: `enabled: false` wins over any
+	// OTEL_* values baked in at build time, so events stay in-process.
 	const telemetryHandle = createConfiguredTelemetryHandle({
 		...createClineTelemetryServiceConfig({
 			metadata: DESKTOP_TELEMETRY_METADATA,
 		}),
+		enabled: false,
 		logger,
 	});
 	const telemetry = telemetryHandle.telemetry;

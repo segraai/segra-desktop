@@ -124,6 +124,22 @@ describe("fetchClineRecommendedModels", () => {
 		]);
 	});
 
+	it("never contacts Cline when Segra Desktop disables the Cline cloud", async () => {
+		vi.stubEnv("SEGRA_DISABLE_CLINE_CLOUD", "1");
+		const fetchImpl = vi.fn(jsonResponse(ENDPOINT_PAYLOAD));
+		try {
+			const data = await fetchClineRecommendedModels({
+				baseUrl: BASE_URL,
+				fetchImpl: fetchImpl as unknown as typeof fetch,
+				catalogLoader: async () => CATALOG,
+			});
+			expect(fetchImpl).not.toHaveBeenCalled();
+			expect(data).toEqual(FALLBACK_CLINE_RECOMMENDED_MODELS);
+		} finally {
+			vi.unstubAllEnvs();
+		}
+	});
+
 	it("identifies the client on the feed request", async () => {
 		setClineClientIdentity({ name: "VSCode Extension", version: "3.40.0" });
 		const fetchImpl = vi.fn(jsonResponse(ENDPOINT_PAYLOAD));

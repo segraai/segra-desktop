@@ -1,0 +1,302 @@
+name: segra-desktop-release
+
+# Builds Segra Desktop for macOS (universal), Windows (x64) and Linux (x64),
+# then publishes a GitHub release with the installers and the updater feed
+# (latest.json) that installed apps poll:
+#   https://github.com/<repo>/releases/latest/download/latest.json
+#
+# Release: bump "version" in apps/examples/desktop-app/package.json and
+# src-tauri/tauri.conf.json, push, then push a tag `segra-desktop-v<version>`.
+#
+# Secrets:
+#   Required: TAURI_SIGNING_PRIVATE_KEY, TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+#     (the updater keypair; the public key is in tauri.conf.json). Installed
+#     apps refuse updates not signed with it.
+#   Optional, macOS: APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD,
+#     APPLE_SIGNING_IDENTITY, APPLE_API_KEY, APPLE_API_ISSUER,
+#     APPLE_API_KEY_CONTENT. Without them the app is unsigned (users
+#     right-click → Open the first time).
+#   Optional, Windows: Authenticode signing is not wired up yet, so Windows
+#     builds are unsigned (SmartScreen → More info → Run anyway). Upstream's
+#     Azure Trusted Signing setup (desktop-publish.yml, tauri-sign-windows.ps1)
+#     can be adapted later.
+#
+# No telemetry secrets: Segra Desktop sends none (scripts/telemetry-define-args.ts
+# inlines every telemetry variable as empty).
+
+on:
+  push:
+    tags:
+      - "segra-desktop-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re)publish, e.g. segra-desktop-v0.0.49"
+        required: true
+        type: string
+
+concurrency:
+  group: segra-desktop-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  BUN_VERSION: "1.4.2"
+  PRODUCT_PREFIX: Segra-Desktop
+
+jobs:
+  validate:
+    name: Validate tag and version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - id: version
+        name: Check the tag matches the app version
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+          HAS_UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+        run: |
+          VERSION="${TAG#segra-desktop-v}"
+          PKG=$(node -p "require('./apps/examples/desktop-app/package.json').version")
+          CONF=$(node -p "require('./apps/examples/desktop-app/src-tauri/tauri.conf.json').version")
+          if [ "$VERSION" != "$PKG" ] || [ "$VERSION" != "$CONF" ]; then
+            echo "Tag $TAG is version $VERSION, but package.json says $PKG and tauri.conf.json says $CONF."
+            exit 1
+          fi
+          if [ "$HAS_UPDATER_KEY" != "true" ]; then
+            echo "TAURI_SIGNING_PRIVATE_KEY is not set; installed apps could not verify this release."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  build-macos:
+    name: Build macOS (universal)
+    needs: validate
+    runs-on: macos-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - run: bun install
+      - run: bun run build:sdk
+      - name: Write App Store Connect API key (when notarizing)
+        env:
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+        run: |
+          if [ -n "$APPLE_API_KEY_CONTENT" ]; then
+            printf "%s" "$APPLE_API_KEY_CONTENT" > "$RUNNER_TEMP/AuthKey.p8"
+            echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No Apple signing secrets: building an unsigned, unnotarized app."
+          fi
+      - name: Build bundle
+        working-directory: apps/examples/desktop-app
+        run: bunx tauri build --target universal-apple-darwin --config src-tauri/tauri.release.conf.json
+        env:
+          # Empty Apple values make Tauri skip signing and notarization.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Keep the DMG layout from tauri.conf.json (the bundler skips it when CI=true).
+          TAURI_BUNDLER_DMG_IGNORE_CI: "true"
+      - name: Collect artifacts
+        working-directory: apps/examples/desktop-app
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          BUNDLE_DIR="src-tauri/target/universal-apple-darwin/release/bundle"
+          OUT="dist/publish"
+          mkdir -p "$OUT"
+          DMG=$(find "$BUNDLE_DIR/dmg" -name '*.dmg' -print -quit)
+          TARBALL=$(find "$BUNDLE_DIR/macos" -name '*.app.tar.gz' -print -quit)
+          if [ -z "$DMG" ] || [ -z "$TARBALL" ] || [ ! -f "${TARBALL}.sig" ]; then
+            echo "missing DMG, updater tarball or its signature under $BUNDLE_DIR"
+            exit 1
+          fi
+          cp "$DMG" "$OUT/${PRODUCT_PREFIX}_${VERSION}_universal.dmg"
+          cp "$TARBALL" "$OUT/${PRODUCT_PREFIX}_${VERSION}_universal.app.tar.gz"
+          cp "${TARBALL}.sig" "$OUT/${PRODUCT_PREFIX}_${VERSION}_universal.app.tar.gz.sig"
+          ls -lh "$OUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: segra-desktop-macos
+          retention-days: 30
+          path: apps/examples/desktop-app/dist/publish/*
+
+  build-windows:
+    name: Build Windows (x64)
+    needs: validate
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      # Bun can't extract its Linux runtimes on a Windows host when
+      # build-desktop-runtime.ts cross-compiles the SSH remote CLIs; seed its
+      # cache from npm instead (same fix as upstream desktop-publish.yml).
+      - name: Seed Bun cache with Linux remote CLI runtimes
+        shell: bash
+        run: |
+          BUN_VERSION="$(bun --version)"
+          CACHE_DIR="${RUNNER_TEMP//\\//}/bun-install-cache"
+          mkdir -p "$CACHE_DIR"
+          for target in linux-x64-baseline linux-aarch64; do
+            dest="$CACHE_DIR/bun-$target-v$BUN_VERSION"
+            work="$(mktemp -d)"
+            (cd "$work" && npm pack "@oven/bun-$target@$BUN_VERSION" --silent >/dev/null && tar -xzf ./*.tgz package/bin/bun)
+            mv "$work/package/bin/bun" "$dest"
+          done
+          echo "BUN_INSTALL_CACHE_DIR=${CACHE_DIR}" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@stable
+      - run: bun install
+      - run: bun run build:sdk
+      - name: Build installer
+        shell: bash
+        working-directory: apps/examples/desktop-app
+        run: bunx tauri build --bundles nsis --config src-tauri/tauri.release.conf.json
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      - name: Collect artifacts
+        shell: bash
+        working-directory: apps/examples/desktop-app
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          OUT="dist/publish"
+          mkdir -p "$OUT"
+          SETUP=$(find src-tauri/target/release/bundle/nsis -name '*-setup.exe' -print -quit)
+          if [ -z "$SETUP" ] || [ ! -f "${SETUP}.sig" ]; then
+            echo "missing NSIS installer or its updater signature"
+            exit 1
+          fi
+          cp "$SETUP" "$OUT/${PRODUCT_PREFIX}_${VERSION}_x64-setup.exe"
+          cp "${SETUP}.sig" "$OUT/${PRODUCT_PREFIX}_${VERSION}_x64-setup.exe.sig"
+          ls -l "$OUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: segra-desktop-windows
+          retention-days: 30
+          path: apps/examples/desktop-app/dist/publish/*
+
+  build-linux:
+    name: Build Linux (x64)
+    needs: validate
+    # The oldest supported LTS, so the packages link against an old glibc and WebKitGTK.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev libxdo-dev libssl-dev build-essential
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: dtolnay/rust-toolchain@stable
+      - run: bun install
+      - run: bun run build:sdk
+      - name: Build packages
+        working-directory: apps/examples/desktop-app
+        run: bunx tauri build --bundles deb,rpm --config src-tauri/tauri.release.conf.json
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      - name: Collect artifacts
+        working-directory: apps/examples/desktop-app
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          BUNDLE_DIR="src-tauri/target/release/bundle"
+          OUT="dist/publish"
+          mkdir -p "$OUT"
+          DEB=$(find "$BUNDLE_DIR/deb" -name '*.deb' -print -quit)
+          RPM=$(find "$BUNDLE_DIR/rpm" -name '*.rpm' -print -quit)
+          for f in "$DEB" "$RPM"; do
+            if [ -z "$f" ] || [ ! -f "${f}.sig" ]; then
+              echo "missing a package or its updater signature under $BUNDLE_DIR"
+              exit 1
+            fi
+          done
+          cp "$DEB" "$OUT/${PRODUCT_PREFIX}_${VERSION}_amd64.deb"
+          cp "${DEB}.sig" "$OUT/${PRODUCT_PREFIX}_${VERSION}_amd64.deb.sig"
+          cp "$RPM" "$OUT/${PRODUCT_PREFIX}_${VERSION}_x86_64.rpm"
+          cp "${RPM}.sig" "$OUT/${PRODUCT_PREFIX}_${VERSION}_x86_64.rpm.sig"
+          ls -lh "$OUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: segra-desktop-linux
+          retention-days: 30
+          path: apps/examples/desktop-app/dist/publish/*
+
+  release:
+    name: Publish GitHub release
+    needs: [validate, build-macos, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist/desktop
+          merge-multiple: true
+      - name: Generate updater manifest
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          bun apps/examples/desktop-app/scripts/generate-update-manifest.ts \
+            --version "$VERSION" --tag "$TAG" --dir dist/desktop \
+            --out dist/desktop/latest.json --repo "$GITHUB_REPOSITORY"
+          cat dist/desktop/latest.json
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.validate.outputs.tag }}
+          name: Segra Desktop v${{ needs.validate.outputs.version }}
+          # The updater polls releases/latest, so a published release must be the latest.
+          make_latest: "true"
+          files: dist/desktop/*
+          body: |
+            Segra Desktop v${{ needs.validate.outputs.version }}
+
+            Download the installer for your computer:
+            - macOS: `${{ env.PRODUCT_PREFIX }}_${{ needs.validate.outputs.version }}_universal.dmg`. If macOS says the app can't be opened, right-click it and choose Open.
+            - Windows: `${{ env.PRODUCT_PREFIX }}_${{ needs.validate.outputs.version }}_x64-setup.exe`. If SmartScreen warns, choose More info → Run anyway.
+            - Linux: the `.deb` (Debian, Ubuntu) or `.rpm` (Fedora).
+
+            Installed apps update themselves.

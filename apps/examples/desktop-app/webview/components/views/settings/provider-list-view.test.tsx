@@ -264,6 +264,83 @@ describe("ProviderListContent", () => {
 		expect(container.textContent).toContain("ElevenLabs");
 		expect(container.textContent).not.toContain("Anthropic");
 	});
+
+	const segraProvider: Provider = {
+		id: "segra",
+		name: "Segra",
+		models: 2,
+		color: "#000000",
+		letter: "SG",
+		enabled: false,
+		capabilities: ["oauth"],
+		modelList: [],
+	};
+	const unconfigured = catalogProviders.filter(
+		(entry) => entry.id !== "anthropic",
+	);
+
+	it("leads with Segra and folds other providers behind a privacy note", async () => {
+		const onConfigure = vi.fn();
+		const onAddProvider = vi.fn();
+		await act(async () => {
+			root.render(
+				<ProviderListContent
+					onAddProvider={onAddProvider}
+					onConfigure={onConfigure}
+					providers={[...unconfigured, segraProvider]}
+				/>,
+			);
+		});
+
+		const card = container.querySelector('section[aria-label="Segra"]');
+		expect(card?.textContent).toContain("Private");
+		const signIn = Array.from(card?.querySelectorAll("button") ?? []).find(
+			(button) => button.textContent?.includes("Sign in to Segra"),
+		);
+		await act(async () => signIn?.click());
+		expect(onConfigure).toHaveBeenCalledWith("segra");
+
+		const toggle = Array.from(
+			container.querySelectorAll<HTMLButtonElement>("button[aria-expanded]"),
+		).find((button) => button.textContent?.includes("Other providers"));
+		expect(toggle?.getAttribute("aria-expanded")).toBe("false");
+		const others = document.getElementById(
+			toggle?.getAttribute("aria-controls") ?? "",
+		);
+		expect(others?.hidden).toBe(true);
+		// Segra is never listed among the other providers.
+		expect(
+			Array.from(others?.querySelectorAll("button") ?? []).some((button) =>
+				button.textContent?.startsWith("Segra"),
+			),
+		).toBe(false);
+
+		await act(async () => toggle?.click());
+		expect(others?.hidden).toBe(false);
+		expect(others?.textContent).toContain("can't guarantee privacy");
+		const addEndpoint = Array.from(
+			others?.querySelectorAll("button") ?? [],
+		).find((button) => button.textContent?.includes("Add custom endpoint"));
+		await act(async () => addEndpoint?.click());
+		expect(onAddProvider).toHaveBeenCalledOnce();
+	});
+
+	it("opens other providers when one is already configured", async () => {
+		await act(async () => {
+			root.render(
+				<ProviderListContent
+					onAddProvider={vi.fn()}
+					onConfigure={vi.fn()}
+					providers={[...catalogProviders, segraProvider]}
+				/>,
+			);
+		});
+		const toggle = Array.from(
+			container.querySelectorAll<HTMLButtonElement>("button[aria-expanded]"),
+		).find((button) => button.textContent?.includes("Other providers"));
+		expect(toggle?.getAttribute("aria-expanded")).toBe("true");
+		expect(toggle?.textContent).toContain("1 configured");
+	});
 });
 
 describe("ProviderDetailContent auth flows", () => {

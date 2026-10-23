@@ -129,43 +129,4 @@ describe("desktop settings commands", () => {
 		expect(discovery).not.toHaveBeenCalled();
 		expect(ctx.liveSessions.has("cloud")).toBe(true);
 	});
-
-	it("loads cloud-only models only for an enabled cloud picker", async () => {
-		const { ctx } = createContext();
-		const fetchMock = vi.fn(async (input: string | URL | Request) => {
-			if (String(input) === "https://models.dev/api.json") {
-				return new Response(JSON.stringify({}), { status: 200 });
-			}
-			return new Response(
-				JSON.stringify({
-					clineCloud: [
-						{
-							id: "cline-cloud/cloud-only",
-							name: "Cloud Only",
-						},
-					],
-				}),
-				{ status: 200 },
-			);
-		});
-		vi.stubGlobal("fetch", fetchMock);
-
-		process.env.CLINE_CODE_CLOUD_AGENTS = "0";
-		const local = (await handleCommand(ctx, "list_provider_models", {
-			provider: "cline",
-			includeCloudModels: true,
-		})) as { models: Array<{ id: string }> };
-		expect(
-			local.models.some((model) => model.id.startsWith("cline-cloud/")),
-		).toBe(false);
-
-		process.env.CLINE_CODE_CLOUD_AGENTS = "1";
-		const cloud = (await handleCommand(ctx, "list_provider_models", {
-			provider: "cline",
-			includeCloudModels: true,
-		})) as { models: Array<{ id: string }> };
-		expect(cloud.models).toContainEqual(
-			expect.objectContaining({ id: "cline-cloud/cloud-only" }),
-		);
-	});
 });

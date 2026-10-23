@@ -6,6 +6,7 @@ import {
 	readModelSelectionStorageFromWindow,
 } from "@/lib/model-selection";
 import { normalizeProviderId } from "@/lib/provider-id";
+import { startsAsChat } from "@/lib/segra-chat-default";
 import {
 	LOCAL_WORKSPACE_ENVIRONMENT_ID,
 	readWorkspaceSelectionFromWindow,
@@ -66,13 +67,17 @@ export function getInitialChatConfig(
 			: undefined) ||
 		DEFAULT_CHAT_CONFIG.model;
 
+	// Segra Desktop: new local sessions start as a plain chat (no folder).
+	const startFolder = startsAsChat(environmentId)
+		? ""
+		: workspaceSelection.lastWorkspace;
 	const local: ChatSessionConfig = {
 		...DEFAULT_CHAT_CONFIG,
 		environmentId,
 		provider,
 		model,
-		workspaceRoot: workspaceSelection.lastWorkspace,
-		cwd: workspaceSelection.lastWorkspace,
+		workspaceRoot: startFolder,
+		cwd: startFolder,
 	};
 	// Cloud preferences apply only to the local environment.
 	const executionTarget =

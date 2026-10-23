@@ -124,7 +124,7 @@ function sessionRow(title: string): HTMLButtonElement {
 	return row as HTMLButtonElement;
 }
 
-const signedInUser = {
+const _signedInUser = {
 	id: "user-1",
 	email: "beatrix@cline.bot",
 	displayName: "Beatrix",
@@ -947,127 +947,6 @@ describe("AgentSidebar session organization", () => {
 		expect(loadOlderSessions).toHaveBeenCalledOnce();
 	});
 
-	it("shows the signed-in account and active organization in the footer", async () => {
-		invoke.mockResolvedValue(signedInUser);
-
-		await act(async () => {
-			root.render(
-				<AccountProvider>
-					<SidebarProvider>
-						<AgentSidebar
-							activeSessionId={null}
-							onHome={vi.fn()}
-							onSettingsSectionChange={vi.fn()}
-							sessionHistory={makeSessionHistory([], vi.fn())}
-							setView={vi.fn()}
-							settingsSection="General"
-							view="chat"
-						/>
-					</SidebarProvider>
-				</AccountProvider>,
-			);
-		});
-
-		await vi.waitFor(() => {
-			expect(container.textContent).toContain("Beatrix");
-			expect(container.textContent).toContain("Cline Bot Inc");
-		});
-		expect(container.textContent).not.toContain("Cline Desktop");
-		expect(container.textContent).not.toContain("Local");
-		const accountButton = container.querySelector(
-			'[aria-label="Account settings"]',
-		);
-		const settingsButton = container.querySelector('[aria-label="Settings"]');
-		expect(accountButton?.parentElement).toBe(settingsButton?.parentElement);
-		expect(settingsButton?.textContent).toBe("");
-		const accountName = [
-			...(accountButton?.querySelectorAll("span") ?? []),
-		].find((element) => element.textContent === "Beatrix");
-		const organizationName = [
-			...(accountButton?.querySelectorAll("span") ?? []),
-		].find((element) => element.textContent === "Cline Bot Inc");
-		expect(accountName?.nextElementSibling).toBe(organizationName);
-		expect(accountName?.parentElement?.className).toContain("flex-col");
-	});
-
-	it("opens the Account settings section when the footer account row is clicked", async () => {
-		const setView = vi.fn();
-		const onSettingsSectionChange = vi.fn();
-		invoke.mockResolvedValue(signedInUser);
-
-		await act(async () => {
-			root.render(
-				<AccountProvider>
-					<SidebarProvider>
-						<AgentSidebar
-							activeSessionId={null}
-							onHome={vi.fn()}
-							onSettingsSectionChange={onSettingsSectionChange}
-							sessionHistory={makeSessionHistory([], vi.fn())}
-							setView={setView}
-							settingsSection="General"
-							view="chat"
-						/>
-					</SidebarProvider>
-				</AccountProvider>,
-			);
-		});
-
-		const accountButton = await vi.waitFor(() => {
-			const button = container.querySelector('[aria-label="Account settings"]');
-			expect(button).not.toBeNull();
-			return button;
-		});
-		await click(accountButton as Element);
-
-		expect(onSettingsSectionChange).toHaveBeenCalledWith("Account");
-		expect(setView).not.toHaveBeenCalled();
-	});
-
-	it("opens the General settings section from the gear in any section", async () => {
-		invoke.mockResolvedValue(signedInUser);
-		const onSettingsSectionChange = vi.fn();
-
-		const renderSidebar = async (settingsSection: "Account" | "General") => {
-			await act(async () => {
-				root.render(
-					<AccountProvider>
-						<SidebarProvider>
-							<AgentSidebar
-								activeSessionId={null}
-								onHome={vi.fn()}
-								onSettingsSectionChange={onSettingsSectionChange}
-								sessionHistory={makeSessionHistory([], vi.fn())}
-								setView={vi.fn()}
-								settingsSection={settingsSection}
-								view="settings"
-							/>
-						</SidebarProvider>
-					</AccountProvider>,
-				);
-			});
-			return vi.waitFor(() => {
-				const button = container.querySelector('[aria-label="Settings"]');
-				expect(button).not.toBeNull();
-				return button as HTMLButtonElement;
-			});
-		};
-
-		// The Account screen leaves the gear un-highlighted, but clicking it
-		// still navigates to General rather than acting as a no-op.
-		// (split on spaces: the variant's hover:bg-surface-hover would match a
-		// plain substring check)
-		const gearOnAccount = await renderSidebar("Account");
-		expect(gearOnAccount.className.split(" ")).not.toContain(
-			"bg-surface-hover",
-		);
-		await click(gearOnAccount);
-		expect(onSettingsSectionChange).toHaveBeenCalledWith("General");
-
-		const gearOnGeneral = await renderSidebar("General");
-		expect(gearOnGeneral.className.split(" ")).toContain("bg-surface-hover");
-	});
-
 	it("shows the desktop app version and connected Hub when the logo is hovered", async () => {
 		const onHome = vi.fn();
 		invoke.mockImplementation(async (command: string) => {
@@ -1202,6 +1081,27 @@ describe("AgentSidebar session organization", () => {
 		await click(container.querySelector('[aria-label="Next page"]') as Element);
 		expect(onNavigateBack).toHaveBeenCalledOnce();
 		expect(onNavigateForward).toHaveBeenCalledOnce();
+
+		// The window has no reload shortcut, so the title bar offers one.
+		const reload = vi.fn();
+		const originalLocation = window.location;
+		Object.defineProperty(window, "location", {
+			configurable: true,
+			value: { ...originalLocation, reload },
+		});
+		try {
+			const reloadButton = titleBar?.querySelector(
+				'[aria-label="Reload window"]',
+			);
+			expect(reloadButton).not.toBeNull();
+			await click(reloadButton as Element);
+			expect(reload).toHaveBeenCalledOnce();
+		} finally {
+			Object.defineProperty(window, "location", {
+				configurable: true,
+				value: originalLocation,
+			});
+		}
 	});
 
 	it("stacks New, Schedule, and Customize as full-width rows below the logo", async () => {
@@ -1423,7 +1323,7 @@ describe("AgentSidebar session organization", () => {
 							onSettingsSectionChange={vi.fn()}
 							sessionHistory={makeSessionHistory([], vi.fn())}
 							setView={vi.fn()}
-							settingsSection="Account"
+							settingsSection="General"
 							view="settings"
 						/>
 					</SidebarProvider>
@@ -1459,7 +1359,7 @@ describe("AgentSidebar session organization", () => {
 		).toContain("items-start");
 	});
 
-	it("shows only the labeled Settings button when signed out", async () => {
+	it("shows the foldable Settings list instead of a footer button when signed out", async () => {
 		await act(async () => {
 			root.render(
 				<AccountProvider>
@@ -1478,14 +1378,24 @@ describe("AgentSidebar session organization", () => {
 			);
 		});
 
-		await vi.waitFor(() =>
-			expect(container.querySelector('[aria-label="Settings"]')).not.toBeNull(),
-		);
+		// Segra: Settings is a foldable list at the bottom of the sidebar
+		// (folded by default), not a footer button.
+		const heading = () =>
+			[...container.querySelectorAll("button[aria-expanded]")].find(
+				(el) => el.textContent?.trim() === "Settings",
+			);
+		await vi.waitFor(() => expect(heading()).toBeDefined());
+		expect(heading()?.getAttribute("aria-expanded")).toBe("false");
+		expect(container.querySelector('[aria-label="General"]')).toBeNull();
+		expect(container.querySelector('[aria-label="Settings"]')).toBeNull();
 		expect(
 			container.querySelector('[aria-label="Account settings"]'),
 		).toBeNull();
-		expect(
-			container.querySelector('[aria-label="Settings"]')?.textContent,
-		).toContain("Settings");
+
+		await act(async () => {
+			heading()?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(heading()?.getAttribute("aria-expanded")).toBe("true");
+		expect(container.querySelector('[aria-label="General"]')).not.toBeNull();
 	});
 });

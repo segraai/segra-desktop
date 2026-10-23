@@ -11,7 +11,6 @@ import {
 	ArrowRight,
 	Blocks,
 	ChevronDown,
-	CircleUserRound,
 	Clock3,
 	Cloud,
 	Filter,
@@ -28,6 +27,7 @@ import {
 	Plug,
 	Plus,
 	Radio,
+	RotateCw,
 	Search,
 	Settings,
 	SlidersHorizontal,
@@ -87,7 +87,6 @@ import {
 	SETTINGS_SECTIONS,
 	type SettingsSection,
 } from "@/components/views/settings/sections";
-import { useAccount } from "@/contexts/account-context";
 import { useHasConnectedProvider } from "@/hooks/use-has-connected-provider";
 import type {
 	SessionThread,
@@ -160,7 +159,6 @@ const SETTINGS_SECTION_ICONS = {
 	Schedules: Clock3,
 	Import: Import,
 	Remote: Network,
-	Account: CircleUserRound,
 	About: Info,
 	Customize: Blocks,
 	Marketplace: Store,
@@ -177,14 +175,21 @@ function settingsSectionLabel(section: SettingsSection): string {
 	);
 }
 
+const SETTINGS_NAV_OPEN_KEY = "segra.sidebar.settings-open";
+
 function SettingsSectionNavigation({
 	activeSection,
 	collapsed,
 	onSelect,
+	open = true,
+	onToggle,
 }: {
-	activeSection: SettingsSection;
+	activeSection: SettingsSection | null;
 	collapsed: boolean;
 	onSelect: (section: SettingsSection) => void;
+	/** With `onToggle`, the "Settings" heading folds the section list. */
+	open?: boolean;
+	onToggle?: () => void;
 }) {
 	// Voice input only works with a connected model provider, so its section
 	// stays disabled until one is set up (null = catalog still loading).
@@ -239,7 +244,19 @@ function SettingsSectionNavigation({
 				collapsed ? "w-full items-start" : "w-full",
 			)}
 		>
-			{!collapsed ? (
+			{!collapsed && onToggle ? (
+				<button
+					aria-expanded={open}
+					className="flex items-center gap-1 px-2 pb-2 text-left text-sm font-medium text-muted-foreground hover:text-sidebar-foreground"
+					onClick={onToggle}
+					type="button"
+				>
+					Settings
+					<ChevronDown
+						className={cn("size-3 transition-transform", !open && "-rotate-90")}
+					/>
+				</button>
+			) : !collapsed ? (
 				<p className="px-2 pb-2 text-sm font-medium text-muted-foreground">
 					Settings
 				</p>
@@ -249,9 +266,11 @@ function SettingsSectionNavigation({
 			    render under that row), so the section nav skips them there.
 			    The collapsed sidebar has no action rows and keeps them
 			    reachable. */}
-			{SETTINGS_SECTIONS.filter(
-				(section) => collapsed || section !== "Schedules",
-			).map(renderSectionButton)}
+			{open
+				? SETTINGS_SECTIONS.filter(
+						(section) => collapsed || section !== "Schedules",
+					).map(renderSectionButton)
+				: null}
 			{collapsed ? (
 				<>
 					<div className="my-2 h-px w-6 shrink-0 bg-sidebar-border" />
@@ -295,14 +314,6 @@ export function AgentSidebar({
 }) {
 	const { isMobile, setOpen, setOpenMobile, state } = useSidebar();
 	const isCollapsed = !isMobile && state === "collapsed";
-	const { user, activeOrganization } = useAccount();
-	const { displayName, email } = user || {};
-	const username = displayName?.split(" ")?.[0] || email?.split("@")?.[0];
-	const accountName = username?.trim() || "Segra Desktop";
-	const accountScope = user
-		? (activeOrganization?.name ?? "Personal")
-		: undefined;
-	const accountInitial = accountName.charAt(0).toUpperCase();
 	const {
 		deleteThread: deleteHistoryThread,
 		forkThread: forkHistoryThread,
@@ -321,6 +332,35 @@ export function AgentSidebar({
 	const [filter, setFilter] = useState<FilterOption>("All");
 	const [sourceFilter, setSourceFilter] = useState(ALL_SESSION_SOURCES);
 	const [sortMode, setSortMode] = useState<SidebarSortMode>("time");
+	// Segra: the bottom Settings list folds; remembered across launches.
+	// macOS draws its traffic lights over the title bar's left edge; elsewhere
+	// that space is free. Decided after mount so hydration matches.
+	const [reserveTrafficLights, setReserveTrafficLights] = useState(true);
+	useEffect(() => {
+		setReserveTrafficLights(/Mac/i.test(navigator.userAgent));
+	}, []);
+	// Starts folded on both the server and the first client render, then
+	// restores the saved choice after mount so hydration matches.
+	const [settingsNavOpen, setSettingsNavOpen] = useState(false);
+	useEffect(() => {
+		try {
+			if (window.localStorage.getItem(SETTINGS_NAV_OPEN_KEY) === "1") {
+				setSettingsNavOpen(true);
+			}
+		} catch {
+			// Storage unavailable: stay folded.
+		}
+	}, []);
+	const toggleSettingsNav = useCallback(() => {
+		setSettingsNavOpen((current) => {
+			try {
+				window.localStorage.setItem(SETTINGS_NAV_OPEN_KEY, current ? "0" : "1");
+			} catch {
+				// Storage unavailable: the choice lasts until the window reloads.
+			}
+			return !current;
+		});
+	}, []);
 	const [showMoreCount, setShowMoreCount] = useState(
 		INITIAL_VISIBLE_THREAD_COUNT,
 	);
@@ -786,11 +826,27 @@ export function AgentSidebar({
 			<div className="flex h-full min-h-0 w-full min-w-0 shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground">
 				<div
 					className={cn(
-						"flex h-12 shrink-0 items-center justify-end gap-0.5 pr-2 pl-19",
+						"flex h-12 shrink-0 items-center justify-end gap-0.5 pr-2",
+						reserveTrafficLights ? "pl-19" : "pl-2",
 						isCollapsed && "px-0",
 					)}
 					data-tauri-drag-region
 				>
+					{/* Segra Desktop: the window has no reload shortcut, so offer one. */}
+					<Button
+						aria-label="Reload window"
+						className={cn(
+							"size-8 text-muted-foreground hover:bg-surface-hover hover:text-sidebar-foreground",
+							isCollapsed ? "mx-auto" : "mr-auto",
+						)}
+						onClick={() => window.location.reload()}
+						size="icon"
+						title="Reload window"
+						type="button"
+						variant="ghost"
+					>
+						<RotateCw className="size-4" />
+					</Button>
 					{!isCollapsed ? (
 						<>
 							<Button
@@ -1203,20 +1259,17 @@ export function AgentSidebar({
 							</ScrollArea>
 						</div>
 						{/* Segra: the session list stays visible in Settings; the
-						    settings sections sit at the bottom, above the footer. */}
-						{view === "settings" &&
-						(SETTINGS_SECTIONS as readonly string[]).includes(
-							settingsSection,
-						) &&
-						settingsSection !== "Schedules" ? (
-							<div className="shrink-0 border-t border-sidebar-border px-3 pt-3 pb-1">
-								<SettingsSectionNavigation
-									activeSection={settingsSection}
-									collapsed={false}
-									onSelect={openSettingsSection}
-								/>
-							</div>
-						) : null}
+						    settings sections sit at the bottom as a foldable list,
+						    in place of the footer's Settings button. */}
+						<div className="shrink-0 border-t border-sidebar-border px-3 pt-3 pb-1">
+							<SettingsSectionNavigation
+								activeSection={view === "settings" ? settingsSection : null}
+								collapsed={false}
+								onSelect={openSettingsSection}
+								onToggle={toggleSettingsNav}
+								open={settingsNavOpen}
+							/>
+						</div>
 					</>
 				)}
 
@@ -1226,40 +1279,14 @@ export function AgentSidebar({
 						isCollapsed ? "px-1.5" : "px-2",
 					)}
 				>
-					{user && !isCollapsed ? (
-						<div className="flex min-w-0 items-center gap-2">
-							<button
-								aria-label="Account settings"
-								className={cn(
-									"flex min-w-0 flex-1 items-center gap-2.5 rounded-md p-2 text-left text-sidebar-foreground hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-									view === "settings" &&
-										settingsSection === "Account" &&
-										"bg-surface-hover text-sidebar-foreground",
-								)}
-								onClick={() => openSettingsSection("Account")}
-								title={user.email || undefined}
-								type="button"
-							>
-								<span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-									{accountInitial}
-								</span>
-								<span className="flex min-w-0 flex-col leading-tight">
-									<span className="truncate text-sm font-medium">
-										{accountName}
-									</span>
-									{accountScope ? (
-										<span className="truncate text-[11px] text-muted-foreground">
-											{accountScope}
-										</span>
-									) : null}
-								</span>
-							</button>
+					<div className="flex min-w-0 items-center justify-between gap-2">
+						{/* Expanded, Settings lives in the foldable list above. */}
+						{isCollapsed ? (
 							<Button
 								aria-label="Settings"
 								className={cn(
-									"size-9 shrink-0 justify-center px-0",
+									"size-9 min-w-0 justify-center px-0",
 									view === "settings" &&
-										settingsSection !== "Account" &&
 										"bg-surface-hover text-sidebar-foreground",
 								)}
 								onClick={openSettings}
@@ -1269,32 +1296,10 @@ export function AgentSidebar({
 							>
 								<Settings className="size-4" />
 							</Button>
-						</div>
-					) : (
-						<div className="flex min-w-0 items-center justify-between gap-2">
-							<Button
-								aria-label="Settings"
-								className={cn(
-									"min-w-0 justify-start",
-									// Leaves room for the Segra balance on the right.
-									!isCollapsed && "w-auto shrink-0",
-									isCollapsed && "size-9 justify-center px-0",
-									view === "settings" &&
-										"bg-surface-hover text-sidebar-foreground",
-								)}
-								onClick={openSettings}
-								title="Settings"
-								type="button"
-								variant="sidebarItem"
-							>
-								<Settings className="size-4" />
-								{!isCollapsed ? "Settings" : null}
-							</Button>
-							{!isCollapsed ? (
-								<SegraBalance className="min-w-0 pr-2 text-right" />
-							) : null}
-						</div>
-					)}
+						) : (
+							<SegraBalance className="min-w-0 px-2 py-1" />
+						)}
+					</div>
 				</div>
 			</div>
 			<AlertDialog

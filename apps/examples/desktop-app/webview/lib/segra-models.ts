@@ -12,6 +12,7 @@ export const SEGRA_PROVIDER_ID = "segra";
 // `segra_available` is only present when the app is signed in.
 interface SegraCatalog {
 	segra_models_url?: string;
+	segra_billing_url?: string;
 	segra_tier?: "free" | "paid";
 	data?: Array<{
 		id: string;
@@ -24,6 +25,7 @@ interface SegraCatalog {
 
 export interface SegraModelAccess {
 	modelsUrl: string | null;
+	billingUrl: string | null;
 	byId: Map<
 		string,
 		{ name?: string; description?: string; pro: boolean; available: boolean }
@@ -46,6 +48,7 @@ export function useSegraModelAccess(active: boolean) {
 				if (!catalog?.data) return;
 				setAccess({
 					modelsUrl: catalog.segra_models_url ?? null,
+					billingUrl: catalog.segra_billing_url ?? null,
 					byId: new Map(
 						catalog.data.map((m) => [
 							m.id,

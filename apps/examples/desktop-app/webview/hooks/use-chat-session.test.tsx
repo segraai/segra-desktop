@@ -30,6 +30,15 @@ const { invokeMock, subscribeMock } = vi.hoisted(() => ({
 	),
 }));
 
+// Segra Desktop starts new local sessions as a plain chat (no folder). These
+// tests cover upstream's folder-based sessions, so they run with that off;
+// the "starts a new local session as a chat" test turns it on.
+const segraChatDefault = vi.hoisted(() => ({ enabled: false }));
+vi.mock("@/lib/segra-chat-default", () => ({
+	startsAsChat: (environmentId: string) =>
+		segraChatDefault.enabled && environmentId === "local",
+}));
+
 vi.mock("@/lib/desktop-client", () => ({
 	desktopClient: {
 		getTransportError: vi.fn(() => null),
@@ -407,6 +416,7 @@ beforeEach(async () => {
 		});
 	}
 	window.localStorage.clear();
+	segraChatDefault.enabled = false;
 	container = document.createElement("div");
 	document.body.appendChild(container);
 	root = createRoot(container);
@@ -433,6 +443,33 @@ afterEach(async () => {
 });
 
 describe("useChatSession", () => {
+	it("starts a new local session as a chat with no folder", async () => {
+		segraChatDefault.enabled = true;
+		writeWorkspaceSelectionToWindow("local", {
+			lastWorkspace: "/workspace/remembered",
+			workspaces: ["/workspace/remembered"],
+		});
+		invokeMock.mockImplementation(async (command: string) => {
+			if (command === "get_process_context") {
+				return {
+					environmentId: "local",
+					cwd: "/workspace/cline",
+					workspaceRoot: "/workspace/cline",
+				};
+			}
+			if (command === "validate_workspace_directory") {
+				return { environmentId: "local", valid: true };
+			}
+			return [];
+		});
+		await act(async () => root.render(<HookHarness key="chat-default" />));
+		await act(async () => {
+			await Promise.resolve();
+		});
+		expect(current.config.workspaceRoot).toBe("");
+		expect(current.config.cwd).toBe("");
+	});
+
 	it("keeps a remounted pane's newer draft when the original session start rejects", async () => {
 		const drafts = new Map<string, string>();
 		let draft!: ReturnType<typeof usePromptDraft>;

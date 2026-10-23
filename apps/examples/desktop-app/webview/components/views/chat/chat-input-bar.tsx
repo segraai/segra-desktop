@@ -3,6 +3,7 @@
 import {
 	CLINE_DEFAULT_MODEL_ID,
 	formatDisplayUserInput,
+	isChatWorkspacePath,
 } from "@cline/shared/browser";
 import {
 	AgentComposer,
@@ -32,6 +33,7 @@ import {
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SpeechInput } from "@/components/ai-elements/speech-input";
 import { FILES_DROPPED_EVENT } from "@/components/file-drop-guard";
+import { SegraPrivacyBadge } from "@/components/segra-privacy-badge";
 import {
 	Select,
 	SelectContent,
@@ -1422,9 +1424,11 @@ function ChatInputBarImpl({
 												: "Agent is working... submit to queue another message"
 											: executionTarget === "cloud"
 												? "Describe what Segra Desktop should do in this repository."
-												: variant === "welcome"
-													? "Ask to make changes, @mention files, reference #PRs, or run /commands."
-													: "Enter your question or type / for commands or @ for context"
+												: !workspaceRoot || isChatWorkspacePath(workspaceRoot)
+													? "Ask anything. Type / for commands."
+													: variant === "welcome"
+														? "Ask to make changes, @mention files, reference #PRs, or run /commands."
+														: "Enter your question or type / for commands or @ for context"
 							}
 							readOnly={speechInputActive || readOnly}
 							ref={promptInputRef}
@@ -2232,10 +2236,10 @@ const ModelSelector = memo(function ModelSelector({
 				toast({
 					title: `${name} is a Pro model`,
 					description:
-						"Pro models need a paid account. The model guide explains what each model is good at.",
+						"Pro models need a Pro account. You can upgrade on the Segra website.",
 				});
-				if (segra.access?.modelsUrl)
-					void openExternalUrl(segra.access.modelsUrl);
+				const upgradeUrl = segra.access?.billingUrl ?? segra.access?.modelsUrl;
+				if (upgradeUrl) void openExternalUrl(upgradeUrl);
 				return;
 			}
 			rememberSelection(resolvedProvider, value);
@@ -2395,6 +2399,9 @@ const ModelSelector = memo(function ModelSelector({
 				{/* Uncapped so long model names show in full when the row has
 				    room; the name truncates only once the row runs out of space. */}
 				{renderModelSelect("max-w-full")}
+				{resolvedProvider === SEGRA_PROVIDER_ID && resolvedModel ? (
+					<SegraPrivacyBadge model={resolvedModel} />
+				) : null}
 			</div>
 		</div>
 	);

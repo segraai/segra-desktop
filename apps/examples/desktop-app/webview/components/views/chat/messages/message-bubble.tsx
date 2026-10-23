@@ -18,12 +18,16 @@ import {
 } from "lucide-react";
 import { memo } from "react";
 import { Button } from "@/components/ui/button";
-import { resolveCredentialFailureAction } from "@/hooks/chat-session/helpers";
+import {
+	resolveCredentialFailureAction,
+	segraBillingFailure,
+} from "@/hooks/chat-session/helpers";
 import type {
 	ChatMessage,
 	ChatMessageImage,
 	ChatMessageMedia,
 } from "@/lib/chat-schema";
+import { openExternalUrl } from "@/lib/desktop-client";
 import { cn } from "@/lib/utils";
 import { MemoizedMarkdown } from "../../../ui/markdown";
 import { formatChatMessageContent } from "../message-content";
@@ -184,6 +188,13 @@ export const MessageBubble = memo(function MessageBubble({
 					message.meta.providerAuth,
 				)
 			: null;
+	// Segra account answers (balance used up, Pro model, waitlist) carry their
+	// own link; restored transcripts get the same button.
+	const billingFailure = isError ? segraBillingFailure(displayContent) : null;
+	const billingAction =
+		billingFailure?.label && billingFailure.url
+			? { label: billingFailure.label, url: billingFailure.url }
+			: null;
 	const shouldRenderAssistantActions =
 		message.role === "assistant" &&
 		!isStreaming &&
@@ -262,6 +273,19 @@ export const MessageBubble = memo(function MessageBubble({
 							content={displayContent}
 							streaming={isStreaming && message.role === "assistant"}
 						/>
+					</div>
+				) : null}
+
+				{billingAction ? (
+					<div>
+						<Button
+							onClick={() => void openExternalUrl(billingAction.url)}
+							size="sm"
+							type="button"
+							variant="outline"
+						>
+							{billingAction.label}
+						</Button>
 					</div>
 				) : null}
 

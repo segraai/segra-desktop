@@ -21,7 +21,6 @@ import {
 } from "node:path";
 import { isDeepStrictEqual, promisify } from "node:util";
 import type {
-	ClineAccountActionRequest,
 	CoreSettingsSnapshot,
 	ProviderCapability,
 	ProviderClient,
@@ -33,13 +32,11 @@ import type {
 } from "@cline/core";
 import {
 	addLocalProvider,
-	ClineAccountService,
 	type ClineAccountUser,
 	clearAccountTelemetryIdentity,
 	createConfiguredStreamingTranscriptionSession,
 	createUserInstructionConfigService,
 	ensureCustomProvidersLoaded,
-	executeClineAccountAction,
 	fetchClineRecommendedModels,
 	getCoreBuiltinToolCatalog,
 	getLocalProviderModels,
@@ -82,36 +79,25 @@ import {
 	CLINE_DEFAULT_MODEL_ID,
 	formatSessionSearchPreview,
 	formatSessionSearchTitle,
-	getClineEnvironmentConfig,
 	isCanonicalBase64,
 	ONE_TIME_SCHEDULE_CRON_PATTERN,
 	ONE_TIME_SCHEDULE_RUN_AT_METADATA_KEY,
 	readHubScheduleMode,
 } from "@cline/shared";
 import { readFileSyncStrippingUtf8Bom } from "@cline/shared/node";
-import { resolveClineDir, resolveMcpSettingsPath } from "@cline/shared/storage";
+import {
+	resolveClineDataDir,
+	resolveClineDir,
+	resolveMcpSettingsPath,
+} from "@cline/shared/storage";
 import packageJson from "../package.json";
 import { CLINE_ACCOUNT_NOT_AUTHENTICATED_RESULT } from "../webview/lib/cline-account-state";
 import { MAX_RECORDED_AUDIO_BYTES } from "../webview/lib/voice-input-limits";
 import { resolveDesktopTelemetryUser } from "./client-context";
-import { resolveFreshClineAuthToken } from "./cline-auth";
 import {
 	getCloudSessionManager,
 	resetCloudSessionManager,
 } from "./cloud-sessions";
-import {
-	listClineGitHubRepositories,
-	listClineIntegrations,
-	resolveGitHubInstallUrl,
-} from "./commands-integrations";
-import {
-	cancelComposioConnect,
-	connectComposioToolkit,
-	disconnectComposioToolkit,
-	getComposioStatus,
-	listComposioToolkits,
-	parseComposioToolkitSlug,
-} from "./composio";
 import {
 	connectorChannelsPayload,
 	startConnectorChannel,
@@ -500,7 +486,7 @@ function removePathIfExists(
 	return true;
 }
 
-function syncAccountContextFromResult(
+function _syncAccountContextFromResult(
 	ctx: SidecarContext,
 	manager: ProviderSettingsManager,
 	operation: string,
@@ -2778,41 +2764,10 @@ export async function handleCommand(
 	}
 
 	// ── Cline account ──────────────────────────────────────────────────
+	// Segra Desktop has no Cline account: always report signed out, so nothing
+	// here calls Cline's account API.
 	if (command === "cline_account") {
-		const operation = String(args?.operation ?? "").trim();
-		if (!operation) throw new Error("operation is required");
-		const manager = new ProviderSettingsManager();
-		// Signed out is an expected state, not a command failure: resolve the
-		// token up front and return a typed result the webview can act on
-		// instead of letting the account service throw a generic error that
-		// would be captured as error telemetry and shown raw to the user.
-		const authToken = await resolveFreshClineAuthToken(manager, ctx);
-		if (!authToken) {
-			// Backstop for credentials that go away without a settings write —
-			// an expired or server-revoked token. Explicit sign-out is handled
-			// at its source in `save_provider_settings`; this catches the rest
-			// so a stale account never keeps serving its rollout cohort.
-			syncSignedOutAccountContext(ctx);
-			return CLINE_ACCOUNT_NOT_AUTHENTICATED_RESULT;
-		}
-		const settings = manager.getProviderSettings("cline");
-		const accountService = new ClineAccountService({
-			apiBaseUrl:
-				settings?.baseUrl?.trim() || getClineEnvironmentConfig().apiBaseUrl,
-			getAuthToken: async () => authToken,
-		});
-		const result = await executeClineAccountAction(
-			args as ClineAccountActionRequest,
-			accountService,
-		);
-		if (operation === "switchAccount") {
-			await resetCloudSessionManager(ctx);
-			// The sidebar must re-scope immediately (personal ⇄ org), not on
-			// the next 12s poll.
-			broadcastEvent(ctx, "cloud_sessions_changed", {});
-		}
-		syncAccountContextFromResult(ctx, manager, operation, result);
-		return result;
+		return CLINE_ACCOUNT_NOT_AUTHENTICATED_RESULT;
 	}
 
 	// ── Segra account ──────────────────────────────────────────────────
@@ -2832,7 +2787,9 @@ export async function handleCommand(
 				},
 			);
 			if (!response.ok) return { account: null };
-			return { account: await response.json() };
+			// Top up / upgrade live on the Segra website, at the API's origin.
+			const billingUrl = `${new URL(resolveSegraBaseUrl(settings?.baseUrl)).origin}/billing`;
+			return { account: await response.json(), billingUrl };
 		} catch {
 			return { account: null };
 		}
@@ -2860,77 +2817,67 @@ export async function handleCommand(
 		}
 	}
 
-	// ── Cline integrations (GitHub App) ────────────────────────────────
-	if (command === "cline_integrations") {
-		const operation = String(args?.operation ?? "").trim();
-		if (!operation) throw new Error("operation is required");
-		const manager = new ProviderSettingsManager();
-
-		const authToken = await resolveFreshClineAuthToken(manager, ctx);
-		if (!authToken) {
-			return CLINE_ACCOUNT_NOT_AUTHENTICATED_RESULT;
+	// Per-reply TEE signature checks, newest first. The Segra provider runs in
+	// the hub and records each check (hashes and addresses, never content) in
+	// the data dir; see segra-verify.ts in @cline/llms.
+	if (command === "segra_verifications") {
+		// The website's explainer for every check, opened from the badge.
+		let verifyUrl: string | null = null;
+		try {
+			const settings = new ProviderSettingsManager().getProviderSettings(
+				"segra",
+			);
+			verifyUrl = `${new URL(resolveSegraBaseUrl(settings?.baseUrl)).origin}/verify`;
+		} catch {
+			// No usable base URL: the badge just omits the link.
 		}
-		const settings = manager.getProviderSettings("cline");
-		const environment = getClineEnvironmentConfig();
-		const requestOptions = {
-			apiBaseUrl: settings?.baseUrl?.trim() || environment.apiBaseUrl,
-			appBaseUrl: environment.appBaseUrl,
-			authToken,
-		};
-		switch (operation) {
-			case "list":
-				return await listClineIntegrations(requestOptions);
-			case "listGitHubRepositories":
-				return await listClineGitHubRepositories(requestOptions);
-			case "githubInstallUrl":
-				return await resolveGitHubInstallUrl(requestOptions);
-			default:
-				throw new Error(
-					`Unsupported Cline integrations operation: ${operation}`,
-				);
+		try {
+			const entries = JSON.parse(
+				readFileSync(
+					join(resolveClineDataDir(), "segra", "verifications.json"),
+					"utf8",
+				),
+			);
+			return {
+				entries: Array.isArray(entries) ? entries.slice(0, 50) : [],
+				verifyUrl,
+			};
+		} catch {
+			return { entries: [], verifyUrl };
 		}
 	}
 
-	// ── Composio connectors (Gmail / Google Calendar / GitHub / catalog) ─
+	// The provider's TEE attestation, as checked by the Segra server (public).
+	if (command === "segra_attestation") {
+		const provider = String(args?.provider ?? "").trim();
+		if (!provider) return { attestation: null };
+		const settings = new ProviderSettingsManager().getProviderSettings("segra");
+		try {
+			const origin = new URL(resolveSegraBaseUrl(settings?.baseUrl)).origin;
+			const response = await fetch(
+				`${origin}/api/zg/attestation?provider=${encodeURIComponent(provider)}`,
+				{ signal: AbortSignal.timeout(30_000) },
+			);
+			if (!response.ok) return { attestation: null };
+			return { attestation: await response.json() };
+		} catch {
+			return { attestation: null };
+		}
+	}
+
+	// ── Cline integrations (GitHub App) ────────────────────────────────
+	// Segra Desktop has no Cline account, so there is nothing to list.
+	if (command === "cline_integrations") {
+		return CLINE_ACCOUNT_NOT_AUTHENTICATED_RESULT;
+	}
+
+	// ── Composio connectors ────────────────────────────────────────────
+	// Connectors run through Cline's account API, so Segra Desktop reports
+	// them as unavailable and the UI stays hidden.
 	if (command === "composio_integrations") {
 		const operation = String(args?.operation ?? "").trim();
-		if (!operation) throw new Error("operation is required");
-
-		switch (operation) {
-			case "status":
-				return await getComposioStatus({
-					refresh: args?.refresh === true,
-					logger: ctx.logger,
-					telemetry: ctx.telemetry,
-				});
-			case "listToolkits":
-				return await listComposioToolkits(ctx.logger);
-			case "connect": {
-				const toolkit = parseComposioToolkitSlug(args?.toolkit);
-				// Tie the attempt to the initiating webview so it is abandoned
-				// if that connection goes away before the browser flow finishes.
-				const result = await connectComposioToolkit(toolkit, ctx.logger, {
-					owner: options?.connection,
-				});
-				if (result.redirectUrl) {
-					await openUrlInDefaultBrowser(result.redirectUrl);
-				}
-				return result;
-			}
-			case "cancelConnect": {
-				const toolkit = parseComposioToolkitSlug(args?.toolkit);
-				await cancelComposioConnect(toolkit, ctx.logger);
-				return await getComposioStatus({ logger: ctx.logger });
-			}
-			case "disconnect": {
-				const toolkit = parseComposioToolkitSlug(args?.toolkit);
-				return await disconnectComposioToolkit(toolkit, ctx.logger);
-			}
-			default:
-				throw new Error(
-					`Unsupported Composio integrations operation: ${operation}`,
-				);
-		}
+		if (operation === "status") return { configured: false, integrations: [] };
+		throw new Error("Connectors aren't available in Segra Desktop.");
 	}
 
 	// ── Provider management ────────────────────────────────────────────

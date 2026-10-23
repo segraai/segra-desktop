@@ -1,4 +1,4 @@
-import { getClineEnvironmentConfig } from "@cline/shared";
+import { getClineEnvironmentConfig, isClineCloudDisabled } from "@cline/shared";
 import { buildClineClientHeaders } from "../providers/cline-client-headers";
 import type { ModelInfo } from "./types";
 
@@ -171,6 +171,9 @@ export function normalizeClineRecommendedProviderModels(
 export async function fetchClineRecommendedModelsPayload(
 	fetcher: typeof fetch = fetch,
 ): Promise<ClineRecommendedModelsPayload> {
+	if (isClineCloudDisabled()) {
+		throw new Error("Cline recommended models are disabled");
+	}
 	const url = `${getClineEnvironmentConfig().apiBaseUrl}/api/v1/ai/cline/recommended-models`;
 	const response = await fetcher(url, { headers: buildClineClientHeaders() });
 	if (!response.ok) {

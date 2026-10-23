@@ -12,8 +12,10 @@
 	},
 	"plugins": {
 		"updater": {
-			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENEMTJDNzk2RUExQUY3RDEKUldUUjl4cnFsc2NTelYxNzlFR1NkWnI0VTM1V0hvQXRyOW0xV2c0bFhkL3dhdkdpNGhNRW1MQXEK",
-			"endpoints": []
+			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdDRDEwNTU4M0IyQzM5QjAKUldTd09TdzdXQVhSZkd4TnFITmVnbnRZZndIbkhVNTZ2R2JLMlJ1K09VYlBHNUFGMVJsSWpmT3YK",
+			"endpoints": [
+				"https://github.com/segraai/segra-desktop/releases/latest/download/latest.json"
+			]
 		}
 	},
 	"app": {

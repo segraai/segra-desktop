@@ -49,9 +49,9 @@ function useAppVersion(): string | null {
 	return appVersion;
 }
 
-// Segra: no update server is set up yet (the updater has no endpoints), so
-// the Updates row is hidden. Turn this on once updates are published.
-const UPDATES_ENABLED = false;
+// Release builds check GitHub Releases (tauri.conf.json `plugins.updater`);
+// dev builds have no endpoints, so their check reports that updates are off.
+const UPDATES_ENABLED = true;
 
 function UpdateRow() {
 	const status = useAppUpdateStatus();
@@ -323,6 +323,36 @@ export function AboutContent({
 						<Bug className="size-3" />
 						Visit segra.ai
 					</Button>
+				</div>
+				<div className="flex items-center justify-between gap-5 border-b py-4 max-[720px]:flex-col max-[720px]:items-stretch">
+					<div className="flex flex-col gap-1">
+						<p className="text-base font-semibold text-foreground">
+							Privacy and terms
+						</p>
+						<p className="text-sm text-muted-foreground">
+							What Segra stores, who sees what, and the terms of use.
+						</p>
+					</div>
+					<div className="flex shrink-0 gap-2">
+						<Button
+							onClick={() =>
+								void openExternalUrl(`${SEGRA_SUPPORT_URL}/privacy`)
+							}
+							size="sm"
+							type="button"
+							variant="outline"
+						>
+							Privacy policy
+						</Button>
+						<Button
+							onClick={() => void openExternalUrl(`${SEGRA_SUPPORT_URL}/terms`)}
+							size="sm"
+							type="button"
+							variant="outline"
+						>
+							Terms
+						</Button>
+					</div>
 				</div>
 				<OpenSourceNotice />
 			</section>

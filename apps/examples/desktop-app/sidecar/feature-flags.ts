@@ -16,14 +16,7 @@ import {
 	NoOpFeatureFlagsProvider,
 	resolveCoreDistinctId,
 } from "@cline/core";
-import {
-	buildClinePostHogClient,
-	PostHogFeatureFlagsProvider,
-} from "@cline/core/services/feature-flags/posthog";
-import { FeatureFlag as SharedFeatureFlag } from "@cline/shared";
 import { resolveClineDataDir } from "@cline/shared/storage";
-
-const FEATURE_FLAG_CODE_CLOUD_AGENTS = SharedFeatureFlag.CODE_CLOUD_AGENTS;
 
 const DESKTOP_FEATURE_FLAGS_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const DESKTOP_ACCOUNT_CONTEXT_FILE_VERSION = 1;
@@ -135,18 +128,9 @@ export function getDesktopFeatureFlagsService(options?: {
 	telemetry?: ITelemetryService;
 }): FeatureFlagsService {
 	if (!desktopFeatureFlagsService) {
-		const apiKey = process.env.TELEMETRY_SERVICE_API_KEY;
-		const provider =
-			apiKey &&
-			process.env.IS_TEST !== "true" &&
-			process.env.E2E_TEST !== "true"
-				? new PostHogFeatureFlagsProvider({
-						client: buildClinePostHogClient(apiKey),
-						config: {
-							logger: options?.logger,
-						},
-					})
-				: new NoOpFeatureFlagsProvider();
+		// Segra Desktop never fetches Cline's remote flags (PostHog at
+		// data.cline.bot); every flag resolves to its local default.
+		const provider = new NoOpFeatureFlagsProvider();
 
 		desktopFeatureFlagsService = new FeatureFlagsService({
 			provider,
@@ -274,21 +258,13 @@ export function resetDesktopFeatureFlagsForTesting(): void {
 	desktopAccountContextHydrated = false;
 }
 
-export function readCloudAgentsEnvOverride(): boolean | undefined {
-	const override = process.env.CLINE_CODE_CLOUD_AGENTS?.trim().toLowerCase();
-	if (override === "1" || override === "true") return true;
-	if (override === "0" || override === "false") return false;
-	return undefined;
-}
-
-/** Whether the rollout enables cloud sessions for this install. */
-export function isCloudAgentsEnabled(options?: {
+/**
+ * Cloud sessions run on Cline's servers under a Cline account, so Segra
+ * Desktop never enables them.
+ */
+export function isCloudAgentsEnabled(_options?: {
 	logger?: BasicLogger;
 	telemetry?: ITelemetryService;
 }): boolean {
-	const override = readCloudAgentsEnvOverride();
-	if (override !== undefined) return override;
-	return getDesktopFeatureFlagsService(options).getBooleanFlagEnabled(
-		FEATURE_FLAG_CODE_CLOUD_AGENTS,
-	);
+	return false;
 }

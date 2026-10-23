@@ -27,7 +27,7 @@ use tauri_plugin_updater::UpdaterExt;
 const UPDATE_INITIAL_DELAY: Duration = Duration::from_secs(10);
 const UPDATE_CHECK_INTERVAL: Duration = Duration::from_secs(2 * 60 * 60);
 const MAIN_WINDOW_LABEL: &str = "main";
-const TRAY_ICON_ID: &str = "cline-code";
+const TRAY_ICON_ID: &str = "segra-desktop";
 const TRAY_OPEN_MENU_ID: &str = "tray-open";
 const TRAY_NEW_SESSION_MENU_ID: &str = "tray-new-session";
 const TRAY_SETTINGS_MENU_ID: &str = "tray-settings";
@@ -1431,7 +1431,7 @@ fn setup_tray_icon(
         .text(
             TRAY_OPEN_MENU_ID,
             // package_info().name is the configured productName, so beta
-            // builds ("Cline Beta") identify themselves in the tray too.
+            // builds identify themselves in the tray too.
             format!(
                 "{} v{}",
                 app.package_info().name,
@@ -1452,11 +1452,10 @@ fn setup_tray_icon(
         .text(TRAY_QUIT_MENU_ID, "Quit")
         .build()?;
 
-    // This is the same glyph used by webview/components/cline-logo.tsx,
-    // rasterized without a background. Template mode lets macOS tint it for
-    // the current menu-bar appearance.
+    // The Segra mark, rasterized without a background. Template mode lets
+    // macOS tint it for the current menu-bar appearance.
     #[cfg(target_os = "macos")]
-    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray/cline-template.png"))?;
+    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray/segra-template.png"))?;
     #[cfg(not(target_os = "macos"))]
     let icon = app
         .default_window_icon()

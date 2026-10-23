@@ -5,51 +5,25 @@ import {
 	ArrowLeft,
 	Check,
 	CheckCircle2,
-	ChevronDown,
-	ExternalLink,
 	Import,
-	KeyRound,
 	Loader2,
 	ShieldCheck,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ClineLogo } from "@/components/cline-logo";
+import { useEffect, useRef, useState } from "react";
 import { ImportSessionsDialog } from "@/components/import-sessions-dialog";
 import { SegraWelcomeHero } from "@/components/segra-logo";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
-import { GitHubConnectStep } from "@/components/views/onboarding/onboarding-github-step";
-import { useAccount } from "@/contexts/account-context";
-import {
-	OAUTH_MANAGED_PROVIDERS,
-	SEGRA_DEFAULT_MODEL_ID,
-} from "@/hooks/chat-session/constants";
+import { SEGRA_DEFAULT_MODEL_ID } from "@/hooks/chat-session/constants";
 import { useClineSignIn } from "@/hooks/use-cline-sign-in";
-import { isFeatureEnabled, useFeatureFlags } from "@/hooks/use-feature-flags";
 import { useOAuthUserCode } from "@/hooks/use-oauth-user-code";
-import { isClineAccountNotAuthenticatedResult } from "@/lib/cline-account-state";
 import { desktopClient, openExternalUrl } from "@/lib/desktop-client";
 import {
 	readModelSelectionStorageFromWindow,
 	writeModelSelectionStorageToWindow,
 } from "@/lib/model-selection";
 import {
-	CLINE_DASHBOARD_URL,
-	getProviderApiKeyUrl,
-} from "@/lib/provider-key-urls";
-import {
-	fetchProviderCatalog,
 	invalidateProviderCatalogCache,
 	loadProviderModels,
 } from "@/lib/provider-model-catalog";
-import type { Provider } from "@/lib/provider-schema";
 import {
 	type ListImportableSessionsResponse,
 	SESSION_IMPORT_TOOL_LABELS,
@@ -58,101 +32,15 @@ import {
 } from "@/lib/session-import";
 import { cn } from "@/lib/utils";
 
-const CREATE_ACCOUNT_URL = "https://app.cline.bot";
-const CLINE_PASS_SUBSCRIBE_URL =
-	"https://app.cline.bot/onboarding/individual-plan";
-
-// Segra Desktop signs in with Segra; the upstream Cline account option stays in
-// the code (to keep upstream merges simple) but is not shown.
-const SHOW_CLINE_ACCOUNT_SIGN_IN = false;
-
 const SEGRA_SIGN_IN_BENEFITS = [
 	"Private models running in sealed hardware (TEEs)",
 	"Your code and prompts never pass through Segra",
 	"Uses your Segra credits, no API keys to copy",
 ];
 
-const CLINE_SIGN_IN_BENEFITS = [
-	"Regular free model promotions",
-	"Subscribe to ClinePass for generous usage across the best open weights models like DeepSeek, Kimi, and GLM",
-	"No API key needed",
-];
+export type OnboardingStep = "welcome" | "connect" | "import" | "done";
 
-type ClineRecommendedModelsResponse = {
-	free?: { id: string; name?: string; description?: string }[];
-};
-
-export const GITHUB_ONBOARDING_FEATURE_FLAG = "code-onboarding-github";
-
-export type OnboardingStep =
-	| "welcome"
-	| "connect"
-	| "github"
-	| "import"
-	| "done";
-
-type OnboardingConnection =
-	| { kind: "cline" }
-	| { kind: "provider"; providerName: string };
-
-type SetupMethod = "segra" | "cline" | "api-key";
-
-/**
- * Providers surfaced first in the bring-your-own-key picker. Everything else
- * from the catalog follows alphabetically.
- */
-const PREFERRED_PROVIDER_ORDER = [
-	"segra",
-	"anthropic",
-	"openai-native",
-	"openrouter",
-	"gemini",
-	"xai",
-	"groq",
-	"mistral",
-	"deepseek",
-	"ollama",
-];
-
-/**
- * True when entering an API key is all the provider needs: it declares an
- * API-key config field and nothing beyond key/base-URL. Providers with
- * structured setup (Vertex `gcp.*`, Bedrock `aws.*`) or no API-key field at
- * all (Claude Code) would "connect" here without working, so they stay in
- * Settings where the full form lives. Missing metadata means the catalog
- * fell back to a plain API-key field.
- */
-function isApiKeyOnlyProvider(provider: Provider): boolean {
-	const fields = provider.configFields;
-	if (!fields) {
-		return true;
-	}
-	return (
-		fields.some((field) => field.path === "apiKey") &&
-		fields.every((field) => field.path === "apiKey" || field.path === "baseUrl")
-	);
-}
-
-/**
- * Orders the provider catalog for the API-key setup step: OAuth-managed
- * providers (Cline itself, ClinePass, ChatGPT, OCA) are excluded because they
- * have dedicated sign-in paths, providers needing more than an API key are
- * excluded because this form only collects one, popular API-key providers
- * come first, and the rest follow alphabetically.
- */
-export function sortProvidersForApiKeySetup(providers: Provider[]): Provider[] {
-	const rank = (id: string) => {
-		const index = PREFERRED_PROVIDER_ORDER.indexOf(id);
-		return index === -1 ? PREFERRED_PROVIDER_ORDER.length : index;
-	};
-	return providers
-		.filter(
-			(provider) =>
-				!OAUTH_MANAGED_PROVIDERS.has(provider.id) &&
-				isApiKeyOnlyProvider(provider),
-		)
-		.sort((a, b) => rank(a.id) - rank(b.id) || a.name.localeCompare(b.name));
-}
+type OnboardingConnection = { kind: "provider"; providerName: string };
 
 /**
  * Remembers the connected provider (and its default model when known) so the
@@ -196,63 +84,6 @@ function OnboardingContent({
 	);
 }
 
-function SetupOptionCard({
-	children,
-	id,
-	onSelect,
-	selectLabel,
-	selected,
-}: {
-	children: React.ReactNode;
-	id: SetupMethod;
-	onSelect: () => void;
-	selectLabel: string;
-	selected: boolean;
-}) {
-	const contentRef = useRef<HTMLDivElement>(null);
-	const wasSelectedRef = useRef(selected);
-
-	useEffect(() => {
-		if (selected && !wasSelectedRef.current) {
-			contentRef.current
-				?.querySelector<HTMLElement>(
-					'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-				)
-				?.focus();
-		}
-		wasSelectedRef.current = selected;
-	}, [selected]);
-
-	return (
-		<div
-			className={cn(
-				"relative rounded-xl border p-6 pb-8",
-				selected
-					? "border-primary/20 bg-primary/4 ring-1 ring-primary/20 ring-inset hover:bg-primary/8"
-					: "border-border/70 hover:bg-surface-hover-lighter/60",
-			)}
-			data-onboarding-option={id}
-			data-selected={selected}
-		>
-			{!selected ? (
-				<button
-					aria-label={selectLabel}
-					className="absolute inset-0 z-10 cursor-pointer rounded-xl bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed"
-					onClick={onSelect}
-					type="button"
-				/>
-			) : null}
-			<div
-				data-onboarding-option-content
-				inert={!selected ? true : undefined}
-				ref={contentRef}
-			>
-				{children}
-			</div>
-		</div>
-	);
-}
-
 function SetupOptionHeader({
 	accessory,
 	description,
@@ -280,35 +111,6 @@ function SetupOptionHeader({
 			) : null}
 		</div>
 	);
-}
-
-function ExpandablePanel({
-	children,
-	className,
-	expanded,
-	...props
-}: React.HTMLAttributes<HTMLDivElement> & {
-	expanded: boolean;
-}) {
-	return (
-		<div
-			{...props}
-			aria-hidden={!expanded}
-			className={cn(
-				"grid transition-[grid-template-rows,opacity] duration-120 ease-in-out motion-reduce:transition-none",
-				expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
-				className,
-			)}
-			data-expanded={expanded}
-			inert={!expanded ? true : undefined}
-		>
-			<div className="min-h-0 overflow-hidden">{children}</div>
-		</div>
-	);
-}
-
-function getErrorMessage(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
 }
 
 function WelcomeStep({ onContinue }: { onContinue: () => void }) {
@@ -356,27 +158,6 @@ function ConnectStep({
 	onConnected: (connection: OnboardingConnection) => void;
 	onSkip: () => void;
 }) {
-	const { user, refreshAccount } = useAccount();
-	const {
-		signIn: signInWithCline,
-		cancelSignIn: cancelSignInWithCline,
-		signingIn,
-		cancelling,
-		error: signInError,
-	} = useClineSignIn({
-		onSuccess: async (signal) => {
-			if (signal.aborted) {
-				// Credentials may have been saved before cancellation reached the backend.
-				void refreshAccount();
-				return;
-			}
-			rememberProviderSelection({ id: "cline" });
-			await refreshAccount();
-			if (!signal.aborted) onConnected({ kind: "cline" });
-		},
-		onSettled: invalidateProviderCatalogCache,
-	});
-	const deviceUserCode = useOAuthUserCode(signingIn);
 	const segraSignIn = useClineSignIn({
 		provider: "segra",
 		onSuccess: async (signal) => {
@@ -395,138 +176,6 @@ function ConnectStep({
 		onSettled: invalidateProviderCatalogCache,
 	});
 	const segraUserCode = useOAuthUserCode(segraSignIn.signingIn);
-	const [clineApiKey, setClineApiKey] = useState("");
-	const [clineKeySaving, setClineKeySaving] = useState(false);
-	const [clineKeyError, setClineKeyError] = useState<string | null>(null);
-
-	const connectWithClineApiKey = useCallback(async () => {
-		const key = clineApiKey.trim();
-		if (!key) {
-			return;
-		}
-		setClineKeySaving(true);
-		setClineKeyError(null);
-		try {
-			await desktopClient.invoke("save_provider_settings", {
-				provider: "cline",
-				enabled: true,
-				api_key: key,
-			});
-			// Verify the key against the account API before advancing; the
-			// account context swallows errors, so an invalid key would
-			// otherwise onboard the user into a broken signed-in state.
-			try {
-				const verified = await desktopClient.invoke("cline_account", {
-					action: "clineAccount",
-					operation: "fetchMe",
-				});
-				// A typed not-authenticated result means the sidecar found no
-				// usable credential after the save — the key did not stick.
-				if (isClineAccountNotAuthenticatedResult(verified)) {
-					throw new Error("no Cline account credentials were found");
-				}
-			} catch (verifyError) {
-				// Roll back the persisted key so an unusable credential does
-				// not linger in provider settings.
-				await desktopClient
-					.invoke("save_provider_settings", {
-						provider: "cline",
-						api_key: "",
-					})
-					.catch(() => undefined);
-				throw new Error(
-					`the key could not be verified (${getErrorMessage(verifyError)})`,
-				);
-			}
-			rememberProviderSelection({ id: "cline" });
-			await refreshAccount();
-			onConnected({ kind: "cline" });
-		} catch (error) {
-			setClineKeyError(getErrorMessage(error));
-		} finally {
-			// Credentials may have been saved (or rolled back); drop the
-			// short-lived catalog cache so consumers reload the persisted state.
-			invalidateProviderCatalogCache();
-			setClineKeySaving(false);
-		}
-	}, [clineApiKey, onConnected, refreshAccount]);
-
-	const clineBusy = signingIn || clineKeySaving;
-
-	const [providers, setProviders] = useState<Provider[]>([]);
-	const [providersLoading, setProvidersLoading] = useState(true);
-	const [providersError, setProvidersError] = useState<string | null>(null);
-	const [selectedProviderId, setSelectedProviderId] = useState("");
-	const [apiKey, setApiKey] = useState("");
-	const [saving, setSaving] = useState(false);
-	const [saveError, setSaveError] = useState<string | null>(null);
-
-	useEffect(() => {
-		let cancelled = false;
-		async function loadProviders() {
-			try {
-				const payload = await fetchProviderCatalog();
-				if (cancelled) {
-					return;
-				}
-				setProviders(sortProvidersForApiKeySetup(payload.providers ?? []));
-				setProvidersError(null);
-			} catch (error) {
-				if (cancelled) {
-					return;
-				}
-				setProvidersError(getErrorMessage(error));
-			} finally {
-				if (!cancelled) {
-					setProvidersLoading(false);
-				}
-			}
-		}
-		void loadProviders();
-		return () => {
-			cancelled = true;
-		};
-	}, []);
-
-	const selectedProvider =
-		providers.find((provider) => provider.id === selectedProviderId) ?? null;
-	const selectedProviderKeyUrl = selectedProvider
-		? getProviderApiKeyUrl(selectedProvider)
-		: null;
-
-	const connectProvider = useCallback(async () => {
-		if (!selectedProvider || !apiKey.trim()) {
-			return;
-		}
-		setSaving(true);
-		setSaveError(null);
-		try {
-			await desktopClient.invoke("save_provider_settings", {
-				provider: selectedProvider.id,
-				enabled: true,
-				api_key: apiKey.trim(),
-			});
-			rememberProviderSelection({
-				id: selectedProviderId,
-				defaultModelId: selectedProvider.defaultModelId,
-			});
-			onConnected({
-				kind: "provider",
-				providerName: selectedProvider.name,
-			});
-		} catch (error) {
-			setSaveError(getErrorMessage(error));
-		} finally {
-			// Onboarding completion remounts the chat pane to reload provider
-			// credentials; drop the short-lived catalog cache so that reload
-			// sees the just-saved key rather than a pre-save copy.
-			invalidateProviderCatalogCache();
-			setSaving(false);
-		}
-	}, [apiKey, onConnected, selectedProvider, selectedProviderId]);
-
-	const [selectedMethod, setSelectedMethod] = useState<SetupMethod>("segra");
-	const [clineKeyFormExpanded, setClineKeyFormExpanded] = useState(false);
 
 	return (
 		<OnboardingContent surface="panel">
@@ -543,382 +192,99 @@ function ConnectStep({
 					<ArrowLeft className="size-4" />
 				</IconButton>
 				<h1 className="mt-6 text-2xl font-semibold tracking-tight text-foreground">
-					Set up Segra Desktop
+					Sign in with Segra
 				</h1>
 				<p className="mt-4 text-sm text-muted-foreground">
-					Choose how Segra Desktop connects to models. You can add more
-					providers anytime in Settings.
+					Sign in once in your browser. Segra Desktop then uses your Segra
+					account and credits.
 				</p>
 			</div>
 
-			<div className="mt-8 flex flex-col gap-3">
-				<SetupOptionCard
-					id="segra"
-					onSelect={() => {
-						setSelectedMethod("segra");
-						setClineKeyFormExpanded(false);
-					}}
-					selectLabel="Sign in with Segra"
-					selected={selectedMethod === "segra"}
-				>
-					<SetupOptionHeader
-						accessory={
-							<Badge
-								className="-mt-2 rounded-sm border-primary/30 bg-primary/10 px-1.5 !pt-[0.3rem] !pb-[0.2rem] text-primary-emphasis"
-								variant="outline"
-							>
-								Recommended
-							</Badge>
-						}
-						description={
-							<ul className="flex flex-col gap-1">
-								{SEGRA_SIGN_IN_BENEFITS.map((benefit) => (
-									<li className="flex gap-2" key={benefit}>
-										<Check
-											aria-hidden="true"
-											className="mt-0.5 size-3.5 shrink-0 text-primary"
-										/>
-										<span>{benefit}</span>
-									</li>
-								))}
-							</ul>
-						}
-						icon={<ShieldCheck className="size-5" />}
-						title="Sign in with Segra"
-					/>
-					<div className="mt-8 ml-12 flex flex-wrap items-center gap-1 max-[720px]:ml-0">
-						<Button
-							disabled={segraSignIn.signingIn}
-							onClick={() => void segraSignIn.signIn()}
-							size="md"
-							tone="accent"
-							type="button"
-							variant="fill"
-						>
-							{segraSignIn.signingIn && (
-								<Loader2 className="size-4 animate-spin" />
-							)}
-							{segraSignIn.signingIn ? "Waiting for browser..." : "Sign in"}
-						</Button>
-						{segraSignIn.signingIn ? (
-							<Button
-								disabled={segraSignIn.cancelling}
-								onClick={() => void segraSignIn.cancelSignIn()}
-								size="md"
-								tone="neutral"
-								type="button"
-								variant="ghost"
-							>
-								Cancel
-							</Button>
-						) : null}
-					</div>
-					{segraSignIn.signingIn && segraUserCode ? (
-						<p className="mt-4 ml-12 text-sm text-muted-foreground max-[720px]:ml-0">
-							Confirm this code in your browser:{" "}
-							<span className="font-mono font-medium text-foreground">
-								{segraUserCode}
-							</span>
-						</p>
-					) : null}
-					{segraSignIn.error ? (
-						<p
-							className="mt-6 ml-12 text-xs text-destructive max-[720px]:ml-0"
-							role="alert"
-						>
-							Sign in failed: {segraSignIn.error}
-						</p>
-					) : null}
-				</SetupOptionCard>
-				{SHOW_CLINE_ACCOUNT_SIGN_IN ? (
-					<SetupOptionCard
-						id="cline"
-						onSelect={() => setSelectedMethod("cline")}
-						selectLabel="Sign in with Cline"
-						selected={selectedMethod === "cline"}
+			<div
+				className="mt-8 rounded-xl border border-primary/20 bg-primary/4 p-6 pb-8 ring-1 ring-primary/20 ring-inset"
+				data-onboarding-option="segra"
+			>
+				<SetupOptionHeader
+					description={
+						<ul className="flex flex-col gap-1">
+							{SEGRA_SIGN_IN_BENEFITS.map((benefit) => (
+								<li className="flex gap-2" key={benefit}>
+									<Check
+										aria-hidden="true"
+										className="mt-0.5 size-3.5 shrink-0 text-primary"
+									/>
+									<span>{benefit}</span>
+								</li>
+							))}
+						</ul>
+					}
+					icon={<ShieldCheck className="size-5" />}
+					title="Private by design"
+				/>
+				<div className="mt-8 ml-12 flex flex-wrap items-center gap-1 max-[720px]:ml-0">
+					<Button
+						disabled={segraSignIn.signingIn}
+						onClick={() => void segraSignIn.signIn()}
+						size="md"
+						tone="accent"
+						type="button"
+						variant="fill"
 					>
-						<SetupOptionHeader
-							description={
-								<ul className="flex flex-col gap-1">
-									{CLINE_SIGN_IN_BENEFITS.map((benefit) => (
-										<li className="flex gap-2" key={benefit}>
-											<Check
-												aria-hidden="true"
-												className="mt-0.5 size-3.5 shrink-0 text-primary"
-											/>
-											<span>{benefit}</span>
-										</li>
-									))}
-								</ul>
-							}
-							icon={<ClineLogo className="size-5" />}
-							title="Sign in with Cline"
-						/>
-						{user ? (
-							<div className="mt-6 flex flex-wrap items-center justify-end gap-6">
-								<p className="text-sm text-muted-foreground">
-									Signed in as{" "}
-									<span className="font-medium">
-										{user.displayName || user.email}
-									</span>
-								</p>
-								<Button
-									onClick={() => {
-										rememberProviderSelection({ id: "cline" });
-										onConnected({ kind: "cline" });
-									}}
-									size="md"
-									tone="accent"
-									type="button"
-									variant="fill"
-								>
-									Continue
-								</Button>
-							</div>
-						) : (
-							<div className="mt-8 ml-12 flex flex-wrap items-center gap-1 max-[720px]:ml-0">
-								<Button
-									disabled={clineBusy}
-									onClick={() => void signInWithCline()}
-									size="md"
-									tone="accent"
-									type="button"
-									variant="fill"
-								>
-									{signingIn && <Loader2 className="size-4 animate-spin" />}
-									{signingIn ? "Waiting for browser..." : "Sign in"}
-								</Button>
-								{signingIn ? (
-									<Button
-										disabled={cancelling}
-										onClick={() => void cancelSignInWithCline()}
-										size="md"
-										tone="neutral"
-										type="button"
-										variant="ghost"
-									>
-										Cancel
-									</Button>
-								) : (
-									<Button
-										onClick={() => void openExternalUrl(CREATE_ACCOUNT_URL)}
-										size="md"
-										tone="neutral"
-										type="button"
-										variant="ghost"
-									>
-										Sign up
-									</Button>
-								)}
-							</div>
+						{segraSignIn.signingIn && (
+							<Loader2 className="size-4 animate-spin" />
 						)}
-						{!user && signingIn && deviceUserCode ? (
-							<p className="mt-4 ml-12 text-sm text-muted-foreground max-[720px]:ml-0">
-								Confirm this code in your browser:{" "}
-								<span className="font-mono font-medium text-foreground">
-									{deviceUserCode}
-								</span>
-							</p>
-						) : null}
-						{signInError ? (
-							<p
-								className="mt-6 ml-12 text-xs text-destructive max-[720px]:ml-0"
-								role="alert"
-							>
-								Sign in failed: {signInError}
-							</p>
-						) : null}
-						{!user ? (
-							<div className="mt-6 ml-10 -mb-2 max-[720px]:ml-0">
-								<Button
-									aria-controls="onboarding-cline-key-form"
-									aria-expanded={clineKeyFormExpanded}
-									disabled={clineBusy}
-									onClick={() => {
-										setSelectedMethod("cline");
-										setClineKeyFormExpanded(!clineKeyFormExpanded);
-									}}
-									size="xs"
-									tone="neutral"
-									type="button"
-									variant="ghost"
-								>
-									Use a Cline API key
-									<ChevronDown aria-hidden="true" className="size-3.5" />
-								</Button>
-								<ExpandablePanel
-									data-onboarding-cline-key-form
-									expanded={clineKeyFormExpanded}
-									id="onboarding-cline-key-form"
-								>
-									<div className="flex flex-col gap-2 pt-3 ml-2 max-[720px]:ml-0">
-										<div className="flex flex-wrap items-center gap-2">
-											<Input
-												aria-label="Cline API key"
-												autoComplete="off"
-												className="min-w-52 flex-1 bg-background"
-												disabled={clineKeySaving}
-												onChange={(event) => {
-													setClineApiKey(event.target.value);
-													setClineKeyError(null);
-												}}
-												onKeyDown={(event) => {
-													if (
-														event.key === "Enter" &&
-														clineApiKey.trim() &&
-														!clineKeySaving
-													) {
-														void connectWithClineApiKey();
-													}
-												}}
-												placeholder="Cline API key"
-												type="password"
-												value={clineApiKey}
-											/>
-											<Button
-												disabled={!clineApiKey.trim() || clineKeySaving}
-												onClick={() => void connectWithClineApiKey()}
-												size="md"
-												tone="accent"
-												type="button"
-												variant="fill"
-											>
-												{clineKeySaving ? (
-													<Loader2 className="size-4 animate-spin" />
-												) : null}
-												{clineKeySaving ? "Connecting..." : "Connect"}
-											</Button>
-										</div>
-										<Button
-											className="self-start -ml-1 mt-1"
-											disabled={clineKeySaving}
-											onClick={() => void openExternalUrl(CLINE_DASHBOARD_URL)}
-											size="xs"
-											tone="neutral"
-											type="button"
-											variant="ghost"
-										>
-											Find your key
-											<ExternalLink className="size-3" />
-										</Button>
-										{clineKeyError ? (
-											<p className="text-xs text-destructive" role="alert">
-												Failed to save API key: {clineKeyError}
-											</p>
-										) : null}
-									</div>
-								</ExpandablePanel>
-							</div>
-						) : null}
-					</SetupOptionCard>
+						{segraSignIn.signingIn ? "Waiting for browser..." : "Sign in"}
+					</Button>
+					{segraSignIn.signingIn ? (
+						<Button
+							disabled={segraSignIn.cancelling}
+							onClick={() => void segraSignIn.cancelSignIn()}
+							size="md"
+							tone="neutral"
+							type="button"
+							variant="ghost"
+						>
+							Cancel
+						</Button>
+					) : null}
+				</div>
+				{segraSignIn.signingIn && segraUserCode ? (
+					<p className="mt-4 ml-12 text-sm text-muted-foreground max-[720px]:ml-0">
+						Confirm this code in your browser:{" "}
+						<span className="font-mono font-medium text-foreground">
+							{segraUserCode}
+						</span>
+					</p>
 				) : null}
-				<SetupOptionCard
-					id="api-key"
-					onSelect={() => {
-						setSelectedMethod("api-key");
-						setClineKeyFormExpanded(false);
-					}}
-					selectLabel="Use your own API key"
-					selected={selectedMethod === "api-key"}
-				>
-					<SetupOptionHeader
-						description="Anthropic, OpenAI, OpenRouter, and more. Requests go to that provider, not to a sealed (TEE) model."
-						icon={<KeyRound className="size-4" />}
-						title="Use your own API key"
-					/>
-					<ExpandablePanel
-						data-onboarding-api-key-form
-						expanded={selectedMethod === "api-key"}
+				{segraSignIn.error ? (
+					<p
+						className="mt-6 ml-12 text-xs text-destructive max-[720px]:ml-0"
+						role="alert"
 					>
-						<div className="flex flex-col gap-3 pt-6">
-							{providersError ? (
-								<p className="text-xs text-destructive" role="alert">
-									Failed to load providers: {providersError}
-								</p>
-							) : (
-								<Select
-									disabled={saving}
-									onValueChange={(value) => {
-										setSelectedProviderId(value);
-										setSaveError(null);
-									}}
-									value={selectedProviderId || undefined}
-								>
-									<SelectTrigger
-										aria-label="Provider"
-										className="w-full bg-background"
-									>
-										<SelectValue
-											placeholder={
-												providersLoading
-													? "Loading providers..."
-													: "Choose a provider"
-											}
-										/>
-									</SelectTrigger>
-									<SelectContent>
-										{providers.map((provider) => (
-											<SelectItem key={provider.id} value={provider.id}>
-												{provider.name}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							)}
-							<Input
-								aria-label="API key"
-								autoComplete="off"
-								className="bg-background"
-								disabled={saving}
-								onChange={(event) => {
-									setApiKey(event.target.value);
-									setSaveError(null);
-								}}
-								placeholder={
-									selectedProvider
-										? `${selectedProvider.name} API key`
-										: "API key"
-								}
-								type="password"
-								value={apiKey}
-							/>
-							<div className="flex flex-wrap items-center justify-end gap-2">
-								{selectedProvider && selectedProviderKeyUrl ? (
-									<Button
-										className="mr-auto"
-										disabled={saving}
-										onClick={() => void openExternalUrl(selectedProviderKeyUrl)}
-										size="xs"
-										tone="neutral"
-										type="button"
-										variant="ghost"
-									>
-										{selectedProvider.docLabel ||
-											`Get a ${selectedProvider.name} API key`}
-										<ExternalLink className="size-3.5" />
-									</Button>
-								) : null}
-								<Button
-									disabled={!selectedProvider || !apiKey.trim() || saving}
-									onClick={() => void connectProvider()}
-									size="md"
-									tone="accent"
-									type="button"
-									variant="fill"
-								>
-									{saving ? <Loader2 className="size-4 animate-spin" /> : null}
-									{saving ? "Connecting..." : "Connect"}
-								</Button>
-							</div>
-							{saveError ? (
-								<p className="text-xs text-destructive" role="alert">
-									Failed to save provider: {saveError}
-								</p>
-							) : null}
-						</div>
-					</ExpandablePanel>
-				</SetupOptionCard>
+						Sign in failed: {segraSignIn.error}
+					</p>
+				) : null}
 			</div>
+
+			<p className="mt-4 text-center text-xs text-muted-foreground">
+				By signing in you agree to the{" "}
+				<button
+					className="underline underline-offset-2 hover:text-foreground"
+					onClick={() => void openExternalUrl("https://segra.ai/terms")}
+					type="button"
+				>
+					terms
+				</button>{" "}
+				and{" "}
+				<button
+					className="underline underline-offset-2 hover:text-foreground"
+					onClick={() => void openExternalUrl("https://segra.ai/privacy")}
+					type="button"
+				>
+					privacy policy
+				</button>
+				.
+			</p>
 
 			<div className="mt-5 flex justify-center">
 				<Button
@@ -928,7 +294,7 @@ function ConnectStep({
 					type="button"
 					variant="ghost"
 				>
-					Skip
+					Not now
 				</Button>
 			</div>
 		</OnboardingContent>
@@ -1084,80 +450,6 @@ function ImportHistoryStep({
 	);
 }
 
-/**
- * Shown after a Cline sign-in: the free models available right now (from the
- * same feed as the composer's Free tier, bundled fallback offline) and the
- * ClinePass upsell. The feed is display-only here; the user picks a model in
- * the composer.
- */
-function ClineModelsSummary() {
-	const [freeModels, setFreeModels] = useState<
-		NonNullable<ClineRecommendedModelsResponse["free"]>
-	>([]);
-
-	useEffect(() => {
-		let cancelled = false;
-		desktopClient
-			.invoke<ClineRecommendedModelsResponse>("list_cline_recommended_models")
-			.then((response) => {
-				if (!cancelled) {
-					setFreeModels(response?.free ?? []);
-				}
-			})
-			.catch(() => {
-				// The upsell still renders without the model list.
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, []);
-
-	return (
-		<div
-			className="mt-6 w-full rounded-xl border border-border bg-background p-5 text-left"
-			data-onboarding-cline-models
-		>
-			{freeModels.length > 0 ? (
-				<>
-					<h2 className="text-sm font-semibold text-foreground">Free models</h2>
-					<p className="mt-1 text-xs text-muted-foreground">
-						Try with limited usage at no cost.
-					</p>
-					<ul className="mt-3 flex flex-wrap gap-1.5">
-						{freeModels.map((model) => (
-							<li key={model.id}>
-								<Badge variant="outline">
-									{model.name?.trim() || model.id}
-								</Badge>
-							</li>
-						))}
-					</ul>
-					<div className="my-4 border-t border-border" />
-				</>
-			) : null}
-			<div className="flex flex-wrap items-center justify-between gap-3">
-				<div className="min-w-0 flex-1">
-					<h2 className="text-sm font-semibold text-foreground">ClinePass</h2>
-					<p className="mt-1 text-xs text-muted-foreground">
-						Generous usage across the best open weights models like DeepSeek,
-						Kimi, and GLM.
-					</p>
-				</div>
-				<Button
-					onClick={() => void openExternalUrl(CLINE_PASS_SUBSCRIBE_URL)}
-					size="sm"
-					tone="neutral"
-					type="button"
-					variant="surface"
-				>
-					Get ClinePass
-					<ExternalLink className="size-3.5" />
-				</Button>
-			</div>
-		</div>
-	);
-}
-
 function DoneStep({
 	connection,
 	onFinish,
@@ -1172,12 +464,11 @@ function DoneStep({
 				<h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground">
 					You&apos;re all set
 				</h1>
-				<p className="mt-3 text-md text-muted-foreground">
-					{connection?.kind === "provider"
-						? `${connection.providerName} is connected.`
-						: "Your Cline account is connected."}
-				</p>
-				{connection?.kind === "cline" ? <ClineModelsSummary /> : null}
+				{connection ? (
+					<p className="mt-3 text-md text-muted-foreground">
+						{connection.providerName} is connected.
+					</p>
+				) : null}
 				<Button
 					className="mt-8 w-full max-w-64"
 					onClick={onFinish}
@@ -1204,11 +495,6 @@ export function OnboardingView({
 	const [connection, setConnection] = useState<OnboardingConnection | null>(
 		null,
 	);
-	const { flags } = useFeatureFlags();
-	const githubStepEnabled = isFeatureEnabled(
-		flags,
-		GITHUB_ONBOARDING_FEATURE_FLAG,
-	);
 
 	return (
 		<div className="relative h-full w-full overflow-y-auto bg-background">
@@ -1234,20 +520,10 @@ export function OnboardingView({
 						onBack={() => setStep("welcome")}
 						onConnected={(nextConnection) => {
 							setConnection(nextConnection);
-							// The GitHub integration lives on the Cline account, so the
-							// step only applies when one is connected
-							setStep(
-								nextConnection.kind === "cline" && githubStepEnabled
-									? "github"
-									: "import",
-							);
+							setStep("import");
 						}}
 						onSkip={onComplete}
 					/>
-				) : step === "github" ? (
-					<OnboardingContent surface="panel">
-						<GitHubConnectStep onContinue={() => setStep("import")} />
-					</OnboardingContent>
 				) : step === "import" ? (
 					<ImportHistoryStep
 						onContinue={() => setStep("done")}

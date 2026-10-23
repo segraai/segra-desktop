@@ -6,9 +6,19 @@
  * short-lived provider session (`POST {baseUrl}/session`), then sends the
  * request straight to that provider's endpoint, so prompts and code never pass
  * through Segra's server. Sessions are cached per model until shortly before
- * they expire. After each response the token counts (never content) are
+ * they expire. After each response the reply's TEE signature is checked
+ * (segra-verify.ts) and the token counts and check result (never content) are
  * reported to `POST {baseUrl}/usage`.
  */
+
+import { sha256 } from "@noble/hashes/sha2";
+import { bytesToHex } from "@noble/hashes/utils";
+import {
+	recordSegraVerification,
+	type SegraVerificationStatus,
+	sha256Hex,
+	verifySegraReply,
+} from "./segra-verify";
 
 export const SEGRA_PROVIDER_ID = "segra";
 // Until the Segra API is deployed, the default is a local Segra server (`npm run dev` in 0g-api).
@@ -26,6 +36,8 @@ interface SegraSession {
 	model: string;
 	token: string;
 	expiresAt: number;
+	/** The provider's attested signing key; older Segra servers omit it. */
+	signer?: string;
 }
 
 type FetchWithOptionalPreconnect = typeof fetch & {
@@ -134,13 +146,15 @@ function readUsage(payload: unknown): Usage | undefined {
 	};
 }
 
-// Finds the final usage in an SSE stream (`stream_options.include_usage`) or a JSON body.
+// Finds the final usage in an SSE stream (`stream_options.include_usage`) or a
+// JSON body, and hashes the raw bytes for the signature check.
 async function collectUsage(
 	body: ReadableStream<Uint8Array>,
 	isStream: boolean,
-): Promise<Usage | undefined> {
+): Promise<{ usage: Usage | undefined; responseSha256: string }> {
 	const reader = body.getReader();
 	const decoder = new TextDecoder();
+	const hash = sha256.create();
 	let buffered = "";
 	let usage: Usage | undefined;
 	const scan = (line: string) => {
@@ -155,6 +169,7 @@ async function collectUsage(
 	for (;;) {
 		const { done, value } = await reader.read();
 		if (done) break;
+		hash.update(value);
 		buffered += decoder.decode(value, { stream: true });
 		if (!isStream) continue;
 		const lines = buffered.split("\n");
@@ -162,15 +177,16 @@ async function collectUsage(
 		for (const line of lines) scan(line.trim());
 	}
 	buffered += decoder.decode();
+	const responseSha256 = bytesToHex(hash.digest());
 	if (!isStream) {
 		try {
-			return readUsage(JSON.parse(buffered));
+			return { usage: readUsage(JSON.parse(buffered)), responseSha256 };
 		} catch {
-			return undefined;
+			return { usage: undefined, responseSha256 };
 		}
 	}
 	scan(buffered.trim());
-	return usage;
+	return { usage, responseSha256 };
 }
 
 function reportUsage(
@@ -180,6 +196,7 @@ function reportUsage(
 	session: SegraSession,
 	chatId: string | null,
 	usage: Usage,
+	verification: SegraVerificationStatus,
 ): Promise<unknown> {
 	return baseFetch(`${baseUrl}/usage`, {
 		method: "POST",
@@ -193,7 +210,7 @@ function reportUsage(
 			chatId,
 			inputTokens: usage.inputTokens,
 			outputTokens: usage.outputTokens,
-			verification: "unavailable",
+			verification,
 		}),
 	}).catch(() => undefined);
 }
@@ -267,7 +284,7 @@ export function createSegraFetch(
 				`${trimTrailingSlashes(session.endpoint)}${path}`,
 				{ method: "POST", headers, body: providerBody, signal: request.signal },
 			);
-			return { session, response };
+			return { session, response, sentBody: providerBody };
 		};
 
 		let sent: Awaited<ReturnType<typeof send>>;
@@ -282,19 +299,39 @@ export function createSegraFetch(
 			throw error;
 		}
 
-		const { session, response } = sent;
+		const { session, response, sentBody } = sent;
 		if (!response.ok || !response.body) return response;
 		const isStream = (response.headers.get("content-type") ?? "").includes(
 			"text/event-stream",
 		);
 		const chatId = response.headers.get("zg-res-key");
+		const requestSha256 = sha256Hex(sentBody);
 		const [forCaller, forUsage] = response.body.tee();
 		void collectUsage(forUsage, isStream)
-			.then((usage) =>
-				usage
-					? reportUsage(baseFetch, baseUrl, apiKey, session, chatId, usage)
-					: undefined,
-			)
+			.then(async ({ usage, responseSha256 }) => {
+				const verification = await verifySegraReply({
+					fetch: baseFetch,
+					endpoint: session.endpoint,
+					chatId,
+					model: session.model,
+					provider: session.provider,
+					expectedSigner: session.signer,
+					requestSha256,
+					responseSha256,
+				});
+				await recordSegraVerification(verification);
+				if (usage) {
+					await reportUsage(
+						baseFetch,
+						baseUrl,
+						apiKey,
+						session,
+						chatId,
+						usage,
+						verification.status,
+					);
+				}
+			})
 			.catch(() => undefined);
 		return new Response(forCaller, {
 			status: response.status,

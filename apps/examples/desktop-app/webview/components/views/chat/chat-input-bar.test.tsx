@@ -198,7 +198,9 @@ async function renderVoiceComposer({
 	readOnly = false,
 	executionTarget,
 	onAttachFiles = vi.fn(),
+	workspace = workspaceValue,
 }: {
+	workspace?: typeof workspaceValue;
 	attachments?: Parameters<typeof ChatInputBar>[0]["attachments"];
 	model?: string;
 	hasRunningAgents?: boolean;
@@ -214,7 +216,7 @@ async function renderVoiceComposer({
 } = {}) {
 	await act(async () => {
 		root.render(
-			<WorkspaceProvider value={workspaceValue}>
+			<WorkspaceProvider value={workspace}>
 				<ChatInputBar
 					readOnly={readOnly}
 					executionTarget={executionTarget}
@@ -1162,6 +1164,28 @@ describe("ChatInputBar", () => {
 		expect(sendButton?.disabled).toBe(false);
 		await act(async () => sendButton?.click());
 		expect(onSend).toHaveBeenCalledWith("external replacement");
+	});
+
+	it("uses a chat placeholder when the session has no folder", async () => {
+		await renderVoiceComposer();
+		const textarea = () => container.querySelector("textarea");
+		expect(textarea()?.placeholder).toBe(
+			"Enter your question or type / for commands or @ for context",
+		);
+
+		await renderVoiceComposer({
+			workspace: { ...workspaceValue, workspaceRoot: "" },
+		});
+		expect(textarea()?.placeholder).toBe("Ask anything. Type / for commands.");
+
+		// A started chat session runs in the shared chat workspace.
+		await renderVoiceComposer({
+			workspace: {
+				...workspaceValue,
+				workspaceRoot: "/home/u/.cline/data/workspaces/chat",
+			},
+		});
+		expect(textarea()?.placeholder).toBe("Ask anything. Type / for commands.");
 	});
 
 	it("discards streaming updates after an equal-valued draft replacement", async () => {

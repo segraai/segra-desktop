@@ -2549,6 +2549,34 @@ describe("persisted run errors", () => {
 	});
 });
 
+describe("ChatMessages Segra billing failures", () => {
+	it("offers the Segra server's link instead of a sign-in action", async () => {
+		const onFixCredentials = vi.fn();
+		await renderMessages(
+			[
+				{
+					id: "error-pro",
+					sessionId: "session-1",
+					role: "error",
+					content:
+						"The run failed: glm-5.3 is a Pro model. Upgrade at https://segra.ai/billing to use it; your account can use 0GM-1.0-35B-A3B. What each model is good at: https://segra.ai/models.",
+					createdAt: 2,
+					meta: { providerId: "segra" },
+				},
+			],
+			{ error: null, onFixCredentials, status: "failed" },
+		);
+		const bubble = container.querySelector(
+			'.cline-chat-message[data-role="error"]',
+		);
+		const labels = [...(bubble?.querySelectorAll("button") ?? [])].map(
+			(button) => button.textContent,
+		);
+		expect(labels).toContain("Upgrade to Pro");
+		expect(labels).not.toContain("Sign in to Segra");
+	});
+});
+
 describe("ChatMessages credential failures", () => {
 	const failure: ChatMessage = {
 		id: "error-1",

@@ -448,7 +448,9 @@ export {
 	CLINE_ENVIRONMENTS,
 	DEFAULT_CLINE_ENVIRONMENT,
 	getClineEnvironmentConfig,
+	isClineCloudDisabled,
 	resolveClineEnvironment,
+	SEGRA_DISABLE_CLINE_CLOUD_ENV,
 } from "./runtime/cline-environment";
 export type {
 	CaptureAgentUnexpectedReasoningTokensInput,

@@ -13,96 +13,25 @@ function defineMap(args: string[]): Record<string, string> {
 }
 
 describe("telemetryDefineArgs", () => {
-	it("inlines every OTEL var getTelemetryBuildTimeConfig reads", () => {
-		const defines = defineMap(
-			telemetryDefineArgs({
-				OTEL_TELEMETRY_ENABLED: "1",
-				OTEL_EXPORTER_OTLP_ENDPOINT: "https://otel.example.com:4318",
-				OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
-				OTEL_EXPORTER_OTLP_HEADERS: "x-api-key=secret",
-				OTEL_LOGS_EXPORTER: "otlp",
-				OTEL_METRICS_EXPORTER: "otlp",
-				OTEL_TRACES_EXPORTER: "otlp",
-				OTEL_METRIC_EXPORT_INTERVAL: "60000",
-			}),
-		);
-		expect(defines["process.env.OTEL_TELEMETRY_ENABLED"]).toBe('"1"');
-		expect(defines["process.env.OTEL_EXPORTER_OTLP_ENDPOINT"]).toBe(
-			'"https://otel.example.com:4318"',
-		);
-		expect(defines["process.env.OTEL_EXPORTER_OTLP_PROTOCOL"]).toBe(
-			'"http/json"',
-		);
-		expect(defines["process.env.OTEL_EXPORTER_OTLP_HEADERS"]).toBe(
-			'"x-api-key=secret"',
-		);
-		expect(defines["process.env.OTEL_LOGS_EXPORTER"]).toBe('"otlp"');
-		expect(defines["process.env.OTEL_METRICS_EXPORTER"]).toBe('"otlp"');
-		expect(defines["process.env.OTEL_TRACES_EXPORTER"]).toBe('"otlp"');
-		expect(defines["process.env.OTEL_METRIC_EXPORT_INTERVAL"]).toBe('"60000"');
-	});
-
-	it("inlines unset OTEL vars as empty strings so binaries never fall back to runtime env", () => {
-		const defines = defineMap(telemetryDefineArgs({}));
-		expect(defines["process.env.OTEL_TELEMETRY_ENABLED"]).toBe('""');
-		expect(defines["process.env.OTEL_EXPORTER_OTLP_ENDPOINT"]).toBe('""');
-		expect(defines["process.env.OTEL_TRACES_EXPORTER"]).toBe('""');
-	});
-
-	it("inlines the trace policy vars the Langfuse relay reads at runtime", () => {
-		const defines = defineMap(
-			telemetryDefineArgs({
-				CLINE_TRACE_SAMPLE_PERCENT: "25",
-				CLINE_TRACE_RECORD_CONTENT: "true",
-			}),
-		);
-		expect(defines["process.env.CLINE_TRACE_SAMPLE_PERCENT"]).toBe('"25"');
-		expect(defines["process.env.CLINE_TRACE_RECORD_CONTENT"]).toBe('"true"');
-		const unset = defineMap(telemetryDefineArgs({}));
-		expect(unset["process.env.CLINE_TRACE_SAMPLE_PERCENT"]).toBe('""');
-		expect(unset["process.env.CLINE_TRACE_RECORD_CONTENT"]).toBe('""');
-	});
-
-	it("includes API key defines only when the vars are set", () => {
-		const withoutKeys = defineMap(telemetryDefineArgs({}));
-		expect(withoutKeys).not.toHaveProperty(
-			"process.env.TELEMETRY_SERVICE_API_KEY",
-		);
-		expect(withoutKeys).not.toHaveProperty("process.env.ERROR_SERVICE_API_KEY");
-
-		const withKeys = defineMap(
-			telemetryDefineArgs({
-				TELEMETRY_SERVICE_API_KEY: "tk",
-				ERROR_SERVICE_API_KEY: "ek",
-			}),
-		);
-		expect(withKeys["process.env.TELEMETRY_SERVICE_API_KEY"]).toBe('"tk"');
-		expect(withKeys["process.env.ERROR_SERVICE_API_KEY"]).toBe('"ek"');
-	});
-
-	it("inlines the cloud-agents toggle only when set at build time", () => {
-		const withoutToggle = defineMap(telemetryDefineArgs({}));
-		expect(withoutToggle).not.toHaveProperty(
-			"process.env.CLINE_CODE_CLOUD_AGENTS",
-		);
-
-		const withToggle = defineMap(
-			telemetryDefineArgs({ CLINE_CODE_CLOUD_AGENTS: "1" }),
-		);
-		expect(withToggle["process.env.CLINE_CODE_CLOUD_AGENTS"]).toBe('"1"');
-	});
-
-	it("JSON-escapes values so headers with quotes survive the define", () => {
-		const defines = defineMap(
-			telemetryDefineArgs({
-				OTEL_EXPORTER_OTLP_HEADERS: 'x-quote="quoted",y=2',
-			}),
-		);
-		expect(defines["process.env.OTEL_EXPORTER_OTLP_HEADERS"]).toBe(
-			JSON.stringify('x-quote="quoted",y=2'),
-		);
-		expect(JSON.parse(defines["process.env.OTEL_EXPORTER_OTLP_HEADERS"])).toBe(
-			'x-quote="quoted",y=2',
-		);
+	it("inlines every telemetry var as empty, whatever the build env holds", () => {
+		const env = {
+			OTEL_TELEMETRY_ENABLED: "1",
+			OTEL_EXPORTER_OTLP_ENDPOINT: "https://otel.example.com:4318",
+			OTEL_EXPORTER_OTLP_HEADERS: "x-api-key=secret",
+			OTEL_TRACES_EXPORTER: "otlp",
+			CLINE_TRACE_SAMPLE_PERCENT: "25",
+			CLINE_TRACE_RECORD_CONTENT: "true",
+			TELEMETRY_SERVICE_API_KEY: "tk",
+			ERROR_SERVICE_API_KEY: "ek",
+		};
+		for (const defines of [
+			defineMap(telemetryDefineArgs(env)),
+			defineMap(telemetryDefineArgs({})),
+		]) {
+			for (const name of Object.keys(env)) {
+				expect(defines[`process.env.${name}`]).toBe('""');
+			}
+		}
+		expect(JSON.stringify(telemetryDefineArgs(env))).not.toContain("secret");
 	});
 });

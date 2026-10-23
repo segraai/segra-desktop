@@ -62,6 +62,7 @@ import { appendCappedCommandOutput } from "@/lib/command-output";
 import { desktopClient } from "@/lib/desktop-client";
 import { imageAttachmentMediaType } from "@/lib/image-attachments";
 import { formatRunError, HUB_INTERRUPTED_MESSAGE_KIND } from "@/lib/run-error";
+import { startsAsChat } from "@/lib/segra-chat-default";
 import {
 	buildSessionDiffState,
 	EMPTY_DIFF_SUMMARY,
@@ -1470,11 +1471,15 @@ export function useChatSession(environmentId: string) {
 						normalizeWorkspacePath(currentWorkspace) !==
 							normalizeWorkspacePath(rememberedWorkspace),
 				);
+				// Segra Desktop: new local sessions stay a plain chat unless the
+				// user picks a folder (see startsAsChat).
 				const workspace = selectionChangedWhileLoading
 					? currentWorkspace
-					: validation.valid === true
-						? rememberedWorkspace
-						: ctx.workspaceRoot || ctx.cwd;
+					: startsAsChat(environmentId)
+						? currentWorkspace
+						: validation.valid === true
+							? rememberedWorkspace
+							: ctx.workspaceRoot || ctx.cwd;
 				return {
 					...prev,
 					environmentId,

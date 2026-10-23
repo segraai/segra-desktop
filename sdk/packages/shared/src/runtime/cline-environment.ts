@@ -105,3 +105,13 @@ export function getClineEnvironmentConfig(
 
 	return applyConfigOverrides(config, readProcessEnv());
 }
+
+/**
+ * Segra Desktop sets this so nothing contacts Cline's servers on its own
+ * (for example the recommended-models feed fetched with every catalog refresh).
+ */
+export const SEGRA_DISABLE_CLINE_CLOUD_ENV = "SEGRA_DISABLE_CLINE_CLOUD";
+
+export function isClineCloudDisabled(): boolean {
+	return readProcessEnv()[SEGRA_DISABLE_CLINE_CLOUD_ENV] === "1";
+}

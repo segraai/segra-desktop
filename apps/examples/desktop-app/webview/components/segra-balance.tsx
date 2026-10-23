@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { desktopClient } from "@/lib/desktop-client";
+import { desktopClient, openExternalUrl } from "@/lib/desktop-client";
 import { subscribeToProviderCatalogInvalidation } from "@/lib/provider-model-catalog";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +11,7 @@ type SegraAccount =
 	| {
 			billing: "wallet";
 			userId: string;
+			tier?: "free" | "paid";
 			credits: number;
 			status: "ok" | "setting_up" | "empty";
 	  };
@@ -44,15 +45,20 @@ function balanceLine(account: SegraAccount): { text: string; low: boolean } {
 /** The signed-in Segra account's balance; renders nothing when signed out. */
 export function SegraBalance({ className }: { className?: string }) {
 	const [account, setAccount] = useState<SegraAccount | null>(null);
+	const [billingUrl, setBillingUrl] = useState<string | null>(null);
 
 	useEffect(() => {
 		let cancelled = false;
 		const load = () => {
 			// No visibility check: WebKitGTK can report a shown window as hidden.
 			desktopClient
-				.invoke<{ account: SegraAccount | null }>("segra_account")
+				.invoke<{ account: SegraAccount | null; billingUrl?: string }>(
+					"segra_account",
+				)
 				.then((result) => {
-					if (!cancelled) setAccount(result?.account ?? null);
+					if (cancelled) return;
+					setAccount(result?.account ?? null);
+					setBillingUrl(result?.billingUrl ?? null);
 				})
 				.catch(() => undefined);
 		};
@@ -83,16 +89,36 @@ export function SegraBalance({ className }: { className?: string }) {
 
 	if (!account) return null;
 	const { text, low } = balanceLine(account);
+	// Free accounts can upgrade to Pro (more so once their credits run out).
+	const action =
+		billingUrl && account.billing === "wallet" && account.tier === "free"
+			? "Upgrade"
+			: null;
 	return (
 		<span
 			className={cn(
-				"truncate text-xs tabular-nums",
-				low ? "text-destructive" : "text-muted-foreground",
+				"flex min-w-0 items-center gap-2 text-xs tabular-nums",
 				className,
 			)}
-			title={`Signed in to Segra as ${account.userId}. ${PRICING_NOTE}`}
 		>
-			{text}
+			<span
+				className={cn(
+					"truncate",
+					low ? "text-destructive" : "text-muted-foreground",
+				)}
+				title={`Signed in to Segra as ${account.userId}. ${PRICING_NOTE}`}
+			>
+				{text}
+			</span>
+			{action && billingUrl ? (
+				<button
+					className="shrink-0 font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					onClick={() => void openExternalUrl(billingUrl)}
+					type="button"
+				>
+					{action}
+				</button>
+			) : null}
 		</span>
 	);
 }

@@ -13,6 +13,7 @@ import {
 	captureSdkError,
 	disableCurrentDirectoryExecutableSearch,
 	ensureLoopbackProxyBypass,
+	SEGRA_DISABLE_CLINE_CLOUD_ENV,
 	setClineClientIdentity,
 } from "@cline/shared";
 import { prewarmWorkspaceMetadata } from "./chat-session";
@@ -56,6 +57,10 @@ async function main(desktopCliPath?: string) {
 	if (!BunRuntime) {
 		throw new Error("sidecar must be run with Bun");
 	}
+
+	// Segra Desktop: no background calls to Cline's servers. Set before any
+	// catalog load; child processes (the hub) inherit it.
+	process.env[SEGRA_DISABLE_CLINE_CLOUD_ENV] = "1";
 
 	// When launched from Finder/the Dock the app inherits launchd's minimal
 	// PATH, so agent-spawned processes can't find shell-profile-installed
