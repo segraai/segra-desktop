@@ -41,6 +41,7 @@ import { ChatMessages } from "@/components/views/chat/chat-messages";
 import { EnvironmentSelector } from "@/components/views/chat/environment-selector";
 import { RemoteDirectoryPicker } from "@/components/views/chat/remote-directory-picker";
 import { WelcomeScreen } from "@/components/views/chat/welcome-chat";
+import { WelcomePrivacyNotice } from "@/components/views/chat/welcome-privacy-notice";
 import { WelcomeSetupNotice } from "@/components/views/chat/welcome-setup-notice";
 import type { OnboardingStep } from "@/components/views/onboarding/onboarding-view";
 import { ExportDiagnosticsDialog } from "@/components/views/settings/export-diagnostics-dialog";
@@ -102,6 +103,7 @@ import {
 	markOnboardingCompleted,
 	ONBOARDING_RESET_EVENT,
 } from "@/lib/onboarding";
+import { OPEN_SETTINGS_SECTION_EVENT } from "@/lib/privacy";
 import { requestPromptInputFocus } from "@/lib/prompt-input-focus";
 import { isProviderConnected } from "@/lib/provider-connection";
 import {
@@ -115,6 +117,7 @@ import type {
 	RemoteEnvironmentListResult,
 	RemoteEnvironmentProfile,
 } from "@/lib/remote-environments";
+import { SEGRA_PROVIDER_ID } from "@/lib/segra-models";
 import {
 	buildSessionAgentActivity,
 	mergeAgentActivity,
@@ -758,6 +761,19 @@ export default function Home() {
 		},
 		[navigateWith],
 	);
+	// "What stays on this computer" links in the chat open Settings → Privacy.
+	useEffect(() => {
+		const handleOpenSection = (event: Event) => {
+			const section = (event as CustomEvent<SettingsSection>).detail;
+			if (section) handleSettingsSectionChange(section);
+		};
+		window.addEventListener(OPEN_SETTINGS_SECTION_EVENT, handleOpenSection);
+		return () =>
+			window.removeEventListener(
+				OPEN_SETTINGS_SECTION_EVENT,
+				handleOpenSection,
+			);
+	}, [handleSettingsSectionChange]);
 	// Standard app shortcuts: Cmd/Ctrl+P for session search, Cmd/Ctrl+N for a
 	// new session, and Cmd/Ctrl+, for settings.
 	useEffect(() => {
@@ -2683,6 +2699,8 @@ function ChatThreadPane({
 								onOpenModelSettings={onOpenModelSettings}
 								onOpenSetup={onOpenSetup}
 							/>
+						) : config.provider === SEGRA_PROVIDER_ID && !isCloudSession ? (
+							<WelcomePrivacyNotice />
 						) : undefined
 					}
 					onListGitBranches={listGitBranches}

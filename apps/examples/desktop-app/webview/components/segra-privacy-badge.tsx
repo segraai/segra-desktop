@@ -1,6 +1,6 @@
 "use client";
 
-import { Shield, ShieldAlert, ShieldCheck } from "lucide-react";
+import { HardDrive, Shield, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
 	Popover,
@@ -8,6 +8,11 @@ import {
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import { desktopClient, openExternalUrl } from "@/lib/desktop-client";
+import {
+	NOT_PRIVATE_PROMISE,
+	openSettingsSection,
+	PRIVATE_PROMISE,
+} from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 
 /** One reply's TEE signature check (segra-verify.ts in @cline/llms). */
@@ -158,7 +163,8 @@ export function SegraPrivacyBadge({ model }: { model: string }) {
 			</PopoverTrigger>
 			<PopoverContent align="start" className="w-80 text-sm" side="top">
 				<p className={cn("font-medium", tone)}>{label}</p>
-				<p className="mt-1 text-muted-foreground">{summary}</p>
+				<p className="mt-1 text-muted-foreground">{PRIVATE_PROMISE}</p>
+				<p className="mt-2 text-muted-foreground">{summary}</p>
 				{latest ? (
 					<dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
 						<dt className="text-muted-foreground">Model</dt>
@@ -226,6 +232,84 @@ export function SegraPrivacyBadge({ model }: { model: string }) {
 						Learn how each check works, and what a failure would mean →
 					</button>
 				) : null}
+				<PrivacyPageLink />
+			</PopoverContent>
+		</Popover>
+	);
+}
+
+function PrivacyPageLink() {
+	return (
+		<button
+			className="mt-2 block text-xs font-medium text-primary hover:underline"
+			onClick={() => openSettingsSection("Privacy")}
+			type="button"
+		>
+			What stays on this computer, and what doesn't →
+		</button>
+	);
+}
+
+/** True when the provider's endpoint is this computer (Ollama, LM Studio…). */
+export function isLoopbackUrl(url: string | undefined): boolean {
+	if (!url) return false;
+	try {
+		const host = new URL(url).hostname.replace(/^\[|\]$/g, "");
+		return (
+			host === "localhost" ||
+			host === "::1" ||
+			host === "0.0.0.0" ||
+			/^127\./.test(host)
+		);
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Composer badge for every provider other than Segra: says plainly whether
+ * the chat leaves this computer.
+ */
+export function ProviderPrivacyBadge({
+	providerName,
+	local,
+}: {
+	providerName: string;
+	local: boolean;
+}) {
+	const Icon = local ? HardDrive : ShieldAlert;
+	const label = local ? "On this computer" : "Not private";
+	const tone = local
+		? "text-muted-foreground"
+		: "text-amber-600 dark:text-amber-400";
+	const summary = local
+		? `${providerName} runs at an address on this computer, so models it runs locally keep your messages and files here. Some local apps can also forward to online models (like Ollama's cloud models), which then see them.`
+		: NOT_PRIVATE_PROMISE(providerName);
+	return (
+		<Popover>
+			<PopoverTrigger asChild>
+				<button
+					aria-label={`Privacy: ${label}`}
+					className={cn(
+						"inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+						tone,
+					)}
+					title={summary}
+					type="button"
+				>
+					<Icon aria-hidden="true" className="size-3.5" />
+					{label}
+				</button>
+			</PopoverTrigger>
+			<PopoverContent align="start" className="w-80 text-sm" side="top">
+				<p className={cn("font-medium", tone)}>{label}</p>
+				<p className="mt-1 text-muted-foreground">{summary}</p>
+				{local ? null : (
+					<p className="mt-2 text-muted-foreground">
+						To keep your work private, pick Segra in the model picker.
+					</p>
+				)}
+				<PrivacyPageLink />
 			</PopoverContent>
 		</Popover>
 	);

@@ -4,6 +4,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+	isLoopbackUrl,
+	ProviderPrivacyBadge,
 	SegraPrivacyBadge,
 	type SegraVerification,
 } from "./segra-privacy-badge";
@@ -136,5 +138,40 @@ describe("SegraPrivacyBadge", () => {
 
 	it("explains that checks start with the first reply", async () => {
 		expect(await renderFor("0GM", [])).toBe("Privacy: Private");
+	});
+
+	it("says plainly that other providers aren't private", async () => {
+		await act(async () => {
+			root.render(<ProviderPrivacyBadge local={false} providerName="OpenAI" />);
+		});
+		const trigger = container.querySelector("button");
+		expect(trigger?.getAttribute("aria-label")).toBe("Privacy: Not private");
+		expect(trigger?.getAttribute("title")).toContain(
+			"sent to OpenAI's servers",
+		);
+	});
+
+	it("shows a provider at a local address as on this computer", async () => {
+		await act(async () => {
+			root.render(<ProviderPrivacyBadge local providerName="Ollama" />);
+		});
+		expect(container.querySelector("button")?.getAttribute("aria-label")).toBe(
+			"Privacy: On this computer",
+		);
+	});
+});
+
+describe("isLoopbackUrl", () => {
+	it("recognizes addresses on this computer", () => {
+		expect(isLoopbackUrl("http://localhost:11434")).toBe(true);
+		expect(isLoopbackUrl("http://127.0.0.1:1234/v1")).toBe(true);
+		expect(isLoopbackUrl("http://[::1]:8080")).toBe(true);
+	});
+
+	it("treats anything else as remote", () => {
+		expect(isLoopbackUrl("https://api.openai.com/v1")).toBe(false);
+		expect(isLoopbackUrl("http://192.168.1.20:11434")).toBe(false);
+		expect(isLoopbackUrl(undefined)).toBe(false);
+		expect(isLoopbackUrl("not a url")).toBe(false);
 	});
 });

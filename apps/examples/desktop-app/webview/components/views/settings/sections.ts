@@ -7,6 +7,7 @@
 
 const ALL_SETTINGS_SECTIONS = [
 	"General",
+	"Privacy",
 	"Providers",
 	"Voice",
 	"Channels",

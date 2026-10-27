@@ -33,7 +33,11 @@ import {
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SpeechInput } from "@/components/ai-elements/speech-input";
 import { FILES_DROPPED_EVENT } from "@/components/file-drop-guard";
-import { SegraPrivacyBadge } from "@/components/segra-privacy-badge";
+import {
+	isLoopbackUrl,
+	ProviderPrivacyBadge,
+	SegraPrivacyBadge,
+} from "@/components/segra-privacy-badge";
 import { useSegraPrivacyCheck } from "@/components/segra-privacy-check";
 import {
 	Select,
@@ -68,6 +72,7 @@ import {
 	writeModelSelectionStorageToWindow,
 	writeReasoningSelectionToWindow,
 } from "@/lib/model-selection";
+import { VOICE_NOTE } from "@/lib/privacy";
 import { subscribeToPromptInputFocus } from "@/lib/prompt-input-focus";
 import { normalizeProviderId } from "@/lib/provider-id";
 import {
@@ -1504,7 +1509,7 @@ function ChatInputBarImpl({
 									onStreamingStart={handleStreamingTranscriptionStart}
 									onTranscriptionChange={handleStreamingTranscriptionChange}
 									recordingMode="streaming"
-									title={`Transcribe live with ${transcriptionTarget.providerName} / ${transcriptionTarget.modelName}`}
+									title={`Transcribe live with ${transcriptionTarget.providerName} / ${transcriptionTarget.modelName}. ${VOICE_NOTE(transcriptionTarget.providerName)}`}
 								/>
 							) : null}
 							{(!isBusy || canSend) && (
@@ -1772,6 +1777,10 @@ const ModelSelector = memo(function ModelSelector({
 	const [providerNames, setProviderNames] = useState<Record<string, string>>(
 		{},
 	);
+	// For the privacy badge: a provider at a loopback address is local.
+	const [providerBaseUrls, setProviderBaseUrls] = useState<
+		Record<string, string>
+	>({});
 	const [modelDetails, setModelDetails] = useState<
 		Record<string, ProviderModel[]>
 	>({});
@@ -2047,6 +2056,13 @@ const ModelSelector = memo(function ModelSelector({
 					...current,
 					...(payload.providerNames ?? {}),
 				}));
+				setProviderBaseUrls(
+					Object.fromEntries(
+						(payload.providers ?? []).flatMap((entry) =>
+							entry.baseUrl ? [[entry.id, entry.baseUrl]] : [],
+						),
+					),
+				);
 				setModelDetails((current) => ({
 					...current,
 					...(payload.providerModelDetails ?? {}),
@@ -2423,6 +2439,13 @@ const ModelSelector = memo(function ModelSelector({
 				{renderModelSelect("max-w-full")}
 				{resolvedProvider === SEGRA_PROVIDER_ID && resolvedModel ? (
 					<SegraPrivacyBadge model={resolvedModel} />
+				) : resolvedProvider && !includeCloudModels ? (
+					<ProviderPrivacyBadge
+						local={isLoopbackUrl(providerBaseUrls[resolvedProvider])}
+						providerName={
+							providerNames[resolvedProvider]?.trim() || resolvedProvider
+						}
+					/>
 				) : null}
 			</div>
 		</div>

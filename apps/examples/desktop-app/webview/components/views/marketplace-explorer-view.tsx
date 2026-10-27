@@ -7,6 +7,7 @@ import {
 	Puzzle,
 	Search,
 	Server,
+	ShieldAlert,
 	Trash2,
 	User,
 	X,
@@ -33,6 +34,7 @@ import {
 	type MarketplaceEntry,
 	type MarketplacePrimitiveType,
 } from "@/lib/marketplace";
+import { EXTENSIONS_NOTE } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 import {
 	MarketplaceListRow,
@@ -496,6 +498,20 @@ function DetailPane({
 						{meta.blurb}
 					</p>
 				</div>
+				{entry.type === "mcp" || entry.type === "plugin" ? (
+					<div className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-xs">
+						<ShieldAlert
+							aria-hidden="true"
+							className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400"
+						/>
+						<p className="text-foreground/80">
+							<span className="font-medium">Privacy.</span>{" "}
+							{entry.type === "mcp"
+								? "This server's tools run when the agent calls them. It may connect to an outside service and send it what the agent passes in, which can include parts of your chat or files. Check what it connects to before installing."
+								: "A plugin runs its own code on this computer with access to your files, and it may connect to outside services. Install only plugins you trust."}
+						</p>
+					</div>
+				) : null}
 
 				{entry.author ? (
 					<div className="rounded-xl border bg-card p-4">
@@ -723,6 +739,7 @@ export function MarketplaceExplorerView({
 							value={query}
 						/>
 					</div>
+					<p className="text-xs text-muted-foreground">{EXTENSIONS_NOTE}</p>
 					<div className="flex flex-wrap items-center gap-1.5">
 						<Button
 							aria-pressed={typeFilter === null}

@@ -1,7 +1,7 @@
 "use client";
 
 import { Switch } from "@cline/ui";
-import { Mic } from "lucide-react";
+import { Mic, ShieldAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -162,6 +162,18 @@ export function VoiceInputContent({
 				description="Speak instead of typing: the microphone in chat transcribes your voice with the model chosen here. Text appears as you speak; Stop ends the live session."
 				title="Voice input"
 			/>
+			<p className="mb-6 flex max-w-2xl items-start gap-2 text-sm text-muted-foreground">
+				<ShieldAlert
+					aria-hidden="true"
+					className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400"
+				/>
+				<span>
+					Your recordings are sent to the provider you pick here to turn them
+					into text, so that provider hears them. Voice doesn't get the
+					secure-hardware protection your chats have; type instead when it
+					matters.
+				</span>
+			</p>
 			{providers !== null &&
 			voiceInput &&
 			!selectedEntry?.models.some(

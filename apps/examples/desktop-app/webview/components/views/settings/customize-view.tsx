@@ -1,11 +1,12 @@
 "use client";
 
-import { Store } from "lucide-react";
+import { ShieldAlert, Store } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { fetchComposioStatus } from "@/lib/composio";
 import { desktopClient } from "@/lib/desktop-client";
+import { EXTENSIONS_NOTE } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 import { PageFrame, PageHeader } from "../page-layout";
 import { ComposioConnectorsView } from "./composio-connectors-view";
@@ -139,6 +140,13 @@ export function CustomizeView({
 				description="Extend what Segra Desktop can do and how it works. Explore the marketplace for more options."
 				title="Customize"
 			/>
+			<p className="-mt-4 mb-6 flex max-w-2xl items-start gap-2 text-sm text-muted-foreground">
+				<ShieldAlert
+					aria-hidden="true"
+					className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400"
+				/>
+				<span>{EXTENSIONS_NOTE}</span>
+			</p>
 
 			<div className="mb-6 flex items-center gap-0 border-b border-border">
 				{CUSTOMIZE_TABS.map((customizeTab) => {

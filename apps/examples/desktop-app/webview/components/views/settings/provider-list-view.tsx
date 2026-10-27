@@ -310,9 +310,9 @@ function SegraProviderCard({
 					</div>
 					<p className="mt-2 text-sm leading-6 text-foreground">
 						The recommended way to use Segra Desktop. Your prompts, code and
-						files go straight from this computer to a model running inside a
-						verified secure enclave. Segra never sees them, and neither does the
-						company running the hardware.
+						files go straight from this computer to a model running inside
+						sealed, secure hardware this computer checks first. Segra never sees
+						them, and neither does the company running the hardware.
 					</p>
 				</div>
 			</div>

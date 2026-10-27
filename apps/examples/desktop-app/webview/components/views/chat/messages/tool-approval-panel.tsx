@@ -2,6 +2,7 @@
 
 import { AgentApprovalCard } from "@cline/ui";
 import { Clock3, ShieldAlert } from "lucide-react";
+import { toolPrivacyNote } from "@/lib/privacy";
 
 export type ToolApprovalRequestItem = {
 	requestId: string;
@@ -63,6 +64,7 @@ export function ToolApprovalPanel({
 				{items.map((item) => {
 					const pendingAction = pendingActions[item.requestId];
 					const error = requestErrors[item.requestId];
+					const privacyNote = toolPrivacyNote(item.toolName);
 					return (
 						<AgentApprovalCard
 							description={
@@ -71,6 +73,9 @@ export function ToolApprovalPanel({
 									{item.iteration != null
 										? ` · Iteration ${item.iteration}`
 										: ""}
+									{privacyNote ? (
+										<span className="mt-1 block">{privacyNote.text}</span>
+									) : null}
 								</>
 							}
 							detail={formatApprovalInput(item.input)}

@@ -31,6 +31,7 @@ import {
 	RotateCw,
 	Search,
 	Settings,
+	ShieldCheck,
 	SlidersHorizontal,
 	Store,
 	Trash2,
@@ -155,6 +156,7 @@ function hubPort(url: string | null): string | null {
 
 const SETTINGS_SECTION_ICONS = {
 	General: SlidersHorizontal,
+	Privacy: ShieldCheck,
 	Providers: Plug,
 	Voice: Mic,
 	Channels: Radio,

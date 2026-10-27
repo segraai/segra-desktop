@@ -11,8 +11,8 @@ import {
 import { ToolFileDiff } from "@cline/ui/components/agent-chat/tool-diff";
 import type { ToolLabelPart } from "@cline/ui/components/agent-chat/tool-summary";
 import Ansi from "ansi-to-react";
-import { AlertCircle, Loader2 } from "lucide-react";
-import { memo, useCallback, useEffect, useState } from "react";
+import { AlertCircle, Info, Loader2 } from "lucide-react";
+import { Fragment, memo, useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	type ChatMessage,
@@ -20,6 +20,7 @@ import {
 	ChatMessageImageSchema,
 } from "@/lib/chat-schema";
 import { appendCappedCommandOutput } from "@/lib/command-output";
+import { toolPrivacyNote } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 import { MemoizedMarkdown } from "../../../ui/markdown";
 import { IS_DEBUG, STREAMING_TITLE_CLASS } from "./constants";
@@ -30,6 +31,7 @@ import {
 	extractRunCommandOutput,
 	extractSubmitSummaryText,
 	formatToolValue,
+	parseToolPayload,
 } from "./tool-summaries";
 
 type ProceedWhileRunningHandler = (
@@ -342,6 +344,17 @@ const ToolCallRow = memo(function ToolCallRow({
 	);
 });
 
+// What a tool call reveals outside this computer (lib/privacy.ts), shown
+// under the row rather than inside it: rows start collapsed.
+function ToolPrivacyNoteLine({ text }: { text: string }) {
+	return (
+		<p className="ml-6 flex items-start gap-1.5 text-xs text-muted-foreground">
+			<Info aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
+			<span>{text}</span>
+		</p>
+	);
+}
+
 export const ToolMessageBlock = memo(
 	function ToolMessageBlock({
 		messages,
@@ -355,16 +368,30 @@ export const ToolMessageBlock = memo(
 		onProceedWhileRunning?: ProceedWhileRunningHandler;
 	}) {
 		if (messages.length === 0) return null;
+		// Each kind of privacy note shows once per group, on its first call.
+		const notedKinds = new Set<string>();
+		const privacyNotes = messages.map((message) => {
+			const toolName =
+				message.meta?.toolName || parseToolPayload(message.content)?.toolName;
+			const note = toolName ? toolPrivacyNote(toolName) : null;
+			if (!note || notedKinds.has(note.kind)) return null;
+			notedKinds.add(note.kind);
+			return note.text;
+		});
 		return (
 			<div className="flex flex-col gap-1">
-				{messages.map((message) => (
-					<ToolCallRow
-						isRunActive={isRunActive}
-						key={message.id}
-						message={message}
-						onExpandImage={onExpandImage}
-						onProceedWhileRunning={onProceedWhileRunning}
-					/>
+				{messages.map((message, index) => (
+					<Fragment key={message.id}>
+						<ToolCallRow
+							isRunActive={isRunActive}
+							message={message}
+							onExpandImage={onExpandImage}
+							onProceedWhileRunning={onProceedWhileRunning}
+						/>
+						{privacyNotes[index] ? (
+							<ToolPrivacyNoteLine text={privacyNotes[index]} />
+						) : null}
+					</Fragment>
 				))}
 			</div>
 		);

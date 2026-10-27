@@ -67,6 +67,7 @@ import { ChannelsContent } from "./channels-view";
 import { CustomizeView } from "./customize-view";
 import { ImportContent } from "./import-view";
 import { NotificationSettings } from "./notification-settings";
+import { PrivacyContent } from "./privacy-view";
 import {
 	ProviderDetailContent,
 	ProviderListContent,
@@ -609,6 +610,8 @@ export function SettingsView({
 				{providerContent}
 				{addProviderDialog}
 			</>
+		) : activeNav === "Privacy" ? (
+			<PrivacyContent />
 		) : activeNav === "Voice" ? (
 			<VoiceInputContent
 				onOpenModelProviders={() => onNavigateSection("Providers")}

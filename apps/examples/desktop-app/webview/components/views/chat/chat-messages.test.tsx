@@ -131,6 +131,25 @@ describe("ChatMessages tool disclosures", () => {
 		expect(icon?.classList.contains(iconClass)).toBe(true);
 	});
 
+	it("notes once per run what a web search reveals, and nothing for local tools", async () => {
+		const tool = (id: string, toolName: string): ChatMessage => ({
+			id,
+			sessionId: "session-1",
+			role: "tool",
+			content: JSON.stringify({ toolName, input: {}, result: {} }),
+			createdAt: 1,
+		});
+		await renderMessages([
+			tool("search-1", "search_web"),
+			tool("search-2", "search_web"),
+			tool("read", "read_files"),
+		]);
+
+		const text = container.textContent ?? "";
+		expect(text.match(/sees the search terms/g)).toHaveLength(1);
+		expect(text).not.toContain("outside service");
+	});
+
 	it("renders a detail-less tool summary as static text", async () => {
 		await renderMessages([
 			{
