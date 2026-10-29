@@ -33,7 +33,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing tag to (re)publish, e.g. segra-desktop-v0.0.49"
+        description: "Existing tag to (re)publish, e.g. segra-desktop-v0.0.50"
         required: true
         type: string
 
