@@ -287,6 +287,10 @@ export function resolveCredentialFailureHint(
 	if (normalizeProviderId(providerId) === "segra") {
 		return "Sign in to Segra again in Settings → Providers → Segra, then try again.";
 	}
+	// Built-in local models have no credentials: point at their settings.
+	if (normalizeProviderId(providerId) === "segra-local") {
+		return "Check the model in Settings → Providers → On this computer, then try again.";
+	}
 	if (!providerAuth) {
 		return "Sign in again using your provider's authentication method, then try again.";
 	}

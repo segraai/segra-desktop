@@ -58,6 +58,11 @@ import { BEDROCK_ROUTING_METADATA } from "./routing/bedrock-cache-point";
 import { GLM_THINKING_ROUTING_METADATA } from "./routing/glm-thinking";
 import { MINIMAX_THINKING_ROUTING_METADATA } from "./routing/minimax-thinking";
 import { SEGRA_DEFAULT_BASE_URL, SEGRA_PROVIDER_ID } from "./vendors/segra";
+import {
+	SEGRA_LOCAL_DEFAULT_BASE_URL,
+	SEGRA_LOCAL_MODELS,
+	SEGRA_LOCAL_PROVIDER_ID,
+} from "./vendors/segra-local";
 
 export const DEFAULT_INTERNAL_OCA_BASE_URL =
 	"https://code-internal.aiservice.us-chicago-1.oci.oraclecloud.com/20250206/app/litellm";
@@ -447,6 +452,22 @@ function buildClaudeCodeModels(): Record<string, ModelInfo> {
 		sonnet: toClaudeCodeModel("sonnet"),
 		haiku: toClaudeCodeModel("haiku"),
 	};
+}
+
+function buildSegraLocalModels(): Record<string, ModelInfo> {
+	return Object.fromEntries(
+		SEGRA_LOCAL_MODELS.map((model) => [
+			model.id,
+			{
+				id: model.id,
+				name: model.name,
+				description: model.description,
+				contextWindow: model.contextWindow,
+				maxInputTokens: model.contextWindow,
+				capabilities: ["streaming", "tools"],
+			} satisfies ModelInfo,
+		]),
+	);
 }
 
 function buildOpenAICodexModels(): Record<string, ModelInfo> {
@@ -1134,6 +1155,23 @@ const OPENAI_COMPATIBLE_SPEC_OVERRIDES: BuiltinSpecOverride[] = [
 					"Segra server. Change it only for a self-hosted or staging Segra server.",
 			},
 		],
+	},
+	{
+		// Segra Desktop's built-in local models, served by the desktop sidecar's
+		// llama.cpp server on loopback (vendors/segra-local.ts). The list is
+		// fixed so each model carries the context it is actually loaded with.
+		id: SEGRA_LOCAL_PROVIDER_ID,
+		name: "On this computer",
+		description:
+			"Models that run on this computer. Nothing you type leaves it.",
+		family: "openai-compatible",
+		popular: 0,
+		capabilities: ["tools"],
+		defaultModelId: "",
+		modelsFactory: buildSegraLocalModels,
+		defaults: { baseUrl: SEGRA_LOCAL_DEFAULT_BASE_URL },
+		configFields: [],
+		metadata: { apiKeyOptional: true },
 	},
 	{
 		id: "oca",

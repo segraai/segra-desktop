@@ -67,12 +67,18 @@ import {
 	isSupportedImageAttachment,
 } from "@/lib/image-attachments";
 import {
+	downloadPercent,
+	type LocalModelsState,
+	SEGRA_LOCAL_PROVIDER_ID,
+	useLocalModels,
+} from "@/lib/local-models";
+import {
 	readModelSelectionStorageFromWindow,
 	readReasoningSelectionStorageFromWindow,
 	writeModelSelectionStorageToWindow,
 	writeReasoningSelectionToWindow,
 } from "@/lib/model-selection";
-import { VOICE_NOTE } from "@/lib/privacy";
+import { LOCAL_PROMISE, VOICE_NOTE } from "@/lib/privacy";
 import { subscribeToPromptInputFocus } from "@/lib/prompt-input-focus";
 import { normalizeProviderId } from "@/lib/provider-id";
 import {
@@ -1733,6 +1739,46 @@ export const ChatInputBar = memo(ChatInputBarImpl);
 // should not re-render for every keystroke in the composer textarea.
 /** Sentinel provider-picker row that opens Settings → Providers instead of selecting. */
 const ADD_PROVIDER_OPTION_VALUE = "__add-provider__";
+const GET_LOCAL_MODELS_OPTION_VALUE = "__get-local-models__";
+
+/**
+ * Built-in local models: the picker lists the downloaded ones (and one that
+ * is downloading, with its progress), then a row to get the other sizes.
+ */
+function applyLocalModels(
+	picker: ModelPickerData,
+	state: LocalModelsState | null,
+	canGetMore: boolean,
+): ModelPickerData {
+	if (!state) return picker;
+	const byId = new Map(state.models.map((model) => [model.id, model]));
+	const options = picker.options.flatMap((option) => {
+		const model = byId.get(option.value);
+		if (!model || model.downloaded) return [option];
+		if (model.download?.status === "downloading") {
+			return [
+				{
+					...option,
+					label: `${option.label} (downloading, ${downloadPercent(model.download)}%)`,
+				},
+			];
+		}
+		return [];
+	});
+	return {
+		...picker,
+		options: canGetMore
+			? [
+					...options,
+					{
+						icon: <Plus className="size-3 shrink-0 text-muted-foreground" />,
+						label: "Get more models",
+						value: GET_LOCAL_MODELS_OPTION_VALUE,
+					},
+				]
+			: options,
+	};
+}
 
 const ModelSelector = memo(function ModelSelector({
 	allowedProviderIds,
@@ -1906,6 +1952,9 @@ const ModelSelector = memo(function ModelSelector({
 	const segra = useSegraModelAccess(
 		!includeCloudModels && resolvedProvider === SEGRA_PROVIDER_ID,
 	);
+	const local = useLocalModels(
+		!includeCloudModels && resolvedProvider === SEGRA_LOCAL_PROVIDER_ID,
+	);
 	// Sectioned picker data: display names plus the Recommended/Free tiers the
 	// SDK stamps onto cline/cline-pass models (ProviderModel.featured).
 	const pickerDataForProvider = useCallback(
@@ -1930,9 +1979,22 @@ const ModelSelector = memo(function ModelSelector({
 							buildModelPickerData(providerId, models),
 							segra.access,
 						)
-					: buildModelPickerData(providerId, models);
+					: providerId === SEGRA_LOCAL_PROVIDER_ID
+						? applyLocalModels(
+								buildModelPickerData(providerId, models),
+								local.state,
+								Boolean(onOpenModelSettings),
+							)
+						: buildModelPickerData(providerId, models);
 		},
-		[includeCloudModels, modelDetails, segra.access, visibleProviderModels],
+		[
+			includeCloudModels,
+			local.state,
+			modelDetails,
+			onOpenModelSettings,
+			segra.access,
+			visibleProviderModels,
+		],
 	);
 	useEffect(() => {
 		const selected = modelDetails[normalizedProvider]?.find(
@@ -2264,6 +2326,11 @@ const ModelSelector = memo(function ModelSelector({
 	);
 	const handleModelSelect = useCallback(
 		(value: string) => {
+			if (value === GET_LOCAL_MODELS_OPTION_VALUE) {
+				setMobileOpen(false);
+				onOpenModelSettings?.();
+				return;
+			}
 			// A Pro model on a free Segra account would only fail when sent:
 			// explain it and open the model guide instead of selecting it.
 			if (
@@ -2283,7 +2350,13 @@ const ModelSelector = memo(function ModelSelector({
 			rememberSelection(resolvedProvider, value);
 			onModelChange(value);
 		},
-		[onModelChange, rememberSelection, resolvedProvider, segra.access],
+		[
+			onModelChange,
+			onOpenModelSettings,
+			rememberSelection,
+			resolvedProvider,
+			segra.access,
+		],
 	);
 	// A remembered or restored Pro model the account can't use (e.g. after a
 	// downgrade): fall back to the first model it can use.
@@ -2354,6 +2427,7 @@ const ModelSelector = memo(function ModelSelector({
 			onOpen={() => {
 				refreshActiveProviderModels();
 				if (resolvedProvider === SEGRA_PROVIDER_ID) segra.refresh();
+				if (resolvedProvider === SEGRA_LOCAL_PROVIDER_ID) local.refresh();
 			}}
 			onValueChange={(value) => {
 				handleModelSelect(value);
@@ -2441,9 +2515,17 @@ const ModelSelector = memo(function ModelSelector({
 					<SegraPrivacyBadge model={resolvedModel} />
 				) : resolvedProvider && !includeCloudModels ? (
 					<ProviderPrivacyBadge
-						local={isLoopbackUrl(providerBaseUrls[resolvedProvider])}
+						local={
+							resolvedProvider === SEGRA_LOCAL_PROVIDER_ID ||
+							isLoopbackUrl(providerBaseUrls[resolvedProvider])
+						}
 						providerName={
 							providerNames[resolvedProvider]?.trim() || resolvedProvider
+						}
+						summary={
+							resolvedProvider === SEGRA_LOCAL_PROVIDER_ID
+								? LOCAL_PROMISE
+								: undefined
 						}
 					/>
 				) : null}

@@ -41,6 +41,7 @@ import { ChatMessages } from "@/components/views/chat/chat-messages";
 import { EnvironmentSelector } from "@/components/views/chat/environment-selector";
 import { RemoteDirectoryPicker } from "@/components/views/chat/remote-directory-picker";
 import { WelcomeScreen } from "@/components/views/chat/welcome-chat";
+import { WelcomeLocalNotice } from "@/components/views/chat/welcome-local-notice";
 import { WelcomePrivacyNotice } from "@/components/views/chat/welcome-privacy-notice";
 import { WelcomeSetupNotice } from "@/components/views/chat/welcome-setup-notice";
 import type { OnboardingStep } from "@/components/views/onboarding/onboarding-view";
@@ -93,6 +94,7 @@ import {
 } from "@/lib/image-attachments";
 import { createLatestSuccessfulRequestGate } from "@/lib/latest-successful-request";
 import { createLocalEnvironmentSelection } from "@/lib/local-environment-selection";
+import { SEGRA_LOCAL_PROVIDER_ID, useLocalModels } from "@/lib/local-models";
 import {
 	readModelSelectionStorageFromWindow,
 	writeExecutionTargetToWindow,
@@ -1317,6 +1319,10 @@ function ChatThreadPane({
 	const [providersLoaded, setProvidersLoaded] = useState(
 		() => readProviderCatalogSnapshot() !== null,
 	);
+	// Built-in local models: download progress for the welcome notice.
+	const localModels = useLocalModels(
+		config.provider === SEGRA_LOCAL_PROVIDER_ID,
+	);
 	// null = unknown (catalog unavailable): never nag in that case.
 	const [hasConnectedProvider, setHasConnectedProvider] = useState<
 		boolean | null
@@ -2280,6 +2286,29 @@ function ChatThreadPane({
 	const handleAbort = useCallback(() => {
 		void abort();
 	}, [abort]);
+	// The welcome notice's model: also new chats' default, as if picked.
+	const handleUseLocalModel = useCallback(
+		(modelId: string) => {
+			setConfig((prev) =>
+				prev.provider === SEGRA_LOCAL_PROVIDER_ID && prev.model !== modelId
+					? { ...prev, model: modelId }
+					: prev,
+			);
+			try {
+				const selection = readModelSelectionStorageFromWindow();
+				writeModelSelectionStorageToWindow({
+					lastProvider: SEGRA_LOCAL_PROVIDER_ID,
+					lastModelByProvider: {
+						...selection.lastModelByProvider,
+						[SEGRA_LOCAL_PROVIDER_ID]: modelId,
+					},
+				});
+			} catch {
+				// Ignore localStorage persistence failures.
+			}
+		},
+		[setConfig],
+	);
 	const handleModelChange = useCallback(
 		(nextModel: string) => {
 			// The shared model picker only persists Local selections.
@@ -2691,10 +2720,19 @@ function ChatThreadPane({
 					}
 					gitBranch={gitBranch}
 					notice={
-						providersLoaded &&
-						hasConnectedProvider === false &&
-						onOpenSetup &&
-						onOpenModelSettings ? (
+						config.provider === SEGRA_LOCAL_PROVIDER_ID &&
+						!isCloudSession &&
+						localModels.state?.engine.available ? (
+							<WelcomeLocalNotice
+								modelId={config.model}
+								onUseModel={handleUseLocalModel}
+								onUseSegra={onOpenSetup}
+								state={localModels.state}
+							/>
+						) : providersLoaded &&
+							hasConnectedProvider === false &&
+							onOpenSetup &&
+							onOpenModelSettings ? (
 							<WelcomeSetupNotice
 								onOpenModelSettings={onOpenModelSettings}
 								onOpenSetup={onOpenSetup}

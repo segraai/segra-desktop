@@ -30,6 +30,8 @@ export enum BUILT_IN_PROVIDER {
 	LMSTUDIO = "lmstudio",
 	// Private TEE-attested models
 	SEGRA = "segra",
+	// Segra Desktop's built-in local models (llama.cpp)
+	SEGRA_LOCAL = "segra-local",
 	// OpenAI-compatible
 	DEEPSEEK = "deepseek",
 	XAI = "xai",

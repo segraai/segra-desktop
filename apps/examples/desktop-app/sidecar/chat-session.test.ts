@@ -427,6 +427,41 @@ describe("pathless session starts", () => {
 	});
 });
 
+describe("built-in local model sessions", () => {
+	it("start with the short prompt and without sub-agent or team tools", async () => {
+		const start = vi.fn(
+			async (_input: { config: Record<string, unknown> }) => ({
+				sessionId: "session-local",
+				manifest: { cwd: "/workspace", workspace_root: "/workspace" },
+				manifestPath: "/tmp/session-local.json",
+				messagesPath: "/tmp/session-local.messages.json",
+			}),
+		);
+		const ctx = {
+			liveSessions: new Map(),
+			restoringWorkspacePaths: new Set(),
+			...localRuntimeContext({ start }),
+		} as unknown as SidecarContext;
+
+		await handleChatSessionCommand(ctx, {
+			action: "start",
+			config: { provider: "segra-local", model: "qwen3.5-4b", mode: "plan" },
+		});
+
+		const config = start.mock.calls[0]?.[0].config ?? {};
+		expect(config).toMatchObject({
+			enableSpawnAgent: false,
+			enableAgentTeams: false,
+		});
+		const systemPrompt = String(config.systemPrompt);
+		expect(systemPrompt).toContain(
+			"You are Segra Desktop, an AI assistant running on the user's computer.",
+		);
+		expect(systemPrompt).toContain("# Plan mode");
+		expect(systemPrompt.length).toBeLessThan(1500);
+	});
+});
+
 describe("environment-bound session attach", () => {
 	it("does not fall through to another host when the requested environment lacks the session", async () => {
 		const sessionId = "same-session-id";

@@ -5,6 +5,7 @@ import {
 	ArrowLeft,
 	Check,
 	CheckCircle2,
+	HardDrive,
 	Import,
 	Loader2,
 	ShieldCheck,
@@ -16,6 +17,12 @@ import { SEGRA_DEFAULT_MODEL_ID } from "@/hooks/chat-session/constants";
 import { useClineSignIn } from "@/hooks/use-cline-sign-in";
 import { useOAuthUserCode } from "@/hooks/use-oauth-user-code";
 import { desktopClient, openExternalUrl } from "@/lib/desktop-client";
+import {
+	formatBytes,
+	SEGRA_LOCAL_PROVIDER_ID,
+	startLocalModelDownload,
+	useLocalModels,
+} from "@/lib/local-models";
 import {
 	readModelSelectionStorageFromWindow,
 	writeModelSelectionStorageToWindow,
@@ -38,9 +45,25 @@ const SEGRA_SIGN_IN_BENEFITS = [
 	"Uses your Segra credits, no API keys to copy",
 ];
 
+// First run leads with Segra, the right fit for most people; running models on
+// this computer is offered below it for those who want the most privacy.
+const SEGRA_CLOUD_POINTS = [
+	"Powerful models that answer quickly, on any computer.",
+	"Not as private as running the AI yourself, but protection the big AI companies don't give you: the AI runs in sealed, secure hardware (a TEE) that no one can look inside, not the company hosting it and not Segra.",
+	"Before anything is sent, this computer checks that the hardware is genuine and sealed.",
+	"Uses your Segra credits, no API keys to copy.",
+];
+const LOCAL_ONLY_NOTE =
+	"The most private option: nothing leaves this computer, and it works offline. But local models are slow on most computers and give simpler answers.";
+
 export type OnboardingStep = "welcome" | "connect" | "import" | "done";
 
-type OnboardingConnection = { kind: "provider"; providerName: string };
+type OnboardingConnection = {
+	kind: "provider";
+	providerName: string;
+	/** Replaces "<provider> is connected." on the last step. */
+	message?: string;
+};
 
 /**
  * Remembers the connected provider (and its default model when known) so the
@@ -113,6 +136,22 @@ function SetupOptionHeader({
 	);
 }
 
+function OptionPoints({ points }: { points: readonly string[] }) {
+	return (
+		<ul className="flex flex-col gap-1">
+			{points.map((point) => (
+				<li className="flex gap-2" key={point}>
+					<Check
+						aria-hidden="true"
+						className="mt-0.5 size-3.5 shrink-0 text-primary"
+					/>
+					<span>{point}</span>
+				</li>
+			))}
+		</ul>
+	);
+}
+
 function WelcomeStep({ onContinue }: { onContinue: () => void }) {
 	return (
 		<OnboardingContent surface="transparent">
@@ -123,13 +162,12 @@ function WelcomeStep({ onContinue }: { onContinue: () => void }) {
 				<h1 className="mt-5 text-4xl font-semibold text-foreground">
 					Segra Desktop
 				</h1>
-				<p className="mt-2 text-lg text-foreground">
-					Private AI coding, sealed in hardware
-				</p>
+				<p className="mt-2 text-lg text-foreground">Private AI for your work</p>
 				<p className="mt-6 text-md text-muted-foreground">
-					Segra Desktop is an AI coding agent. It reads your code, edits files,
-					runs commands, and searches the web from your machine, using models
-					that run in sealed hardware so your code stays private.
+					Segra Desktop is an AI agent. It reads your files, edits them, runs
+					commands, and searches the web from your machine. Its models run in
+					sealed, secure hardware, or on this computer if you prefer, so your
+					work stays private.
 				</p>
 				<Button
 					className="mt-8 w-full max-w-64"
@@ -176,6 +214,32 @@ function ConnectStep({
 		onSettled: invalidateProviderCatalogCache,
 	});
 	const segraUserCode = useOAuthUserCode(segraSignIn.signingIn);
+	const local = useLocalModels();
+	const localAvailable = Boolean(local.state?.engine.available);
+	const recommended = local.state?.models.find(
+		(model) => model.id === local.state?.recommendedId,
+	);
+	const [startingLocal, setStartingLocal] = useState(false);
+	const useThisComputer = async () => {
+		if (!recommended) return;
+		setStartingLocal(true);
+		try {
+			await startLocalModelDownload(recommended.id);
+			rememberProviderSelection({
+				id: SEGRA_LOCAL_PROVIDER_ID,
+				defaultModelId: recommended.id,
+			});
+			onConnected({
+				kind: "provider",
+				providerName: "On this computer",
+				message: recommended.downloaded
+					? `${recommended.name} is ready on this computer.`
+					: `${recommended.name} is downloading. The new chat screen shows its progress, and you can start as soon as it's ready.`,
+			});
+		} finally {
+			setStartingLocal(false);
+		}
+	};
 
 	return (
 		<OnboardingContent surface="panel">
@@ -192,38 +256,42 @@ function ConnectStep({
 					<ArrowLeft className="size-4" />
 				</IconButton>
 				<h1 className="mt-6 text-2xl font-semibold tracking-tight text-foreground">
-					Sign in with Segra
+					{localAvailable ? "Choose where the AI runs" : "Sign in with Segra"}
 				</h1>
 				<p className="mt-4 text-sm text-muted-foreground">
-					Sign in once in your browser. Segra Desktop then uses your Segra
-					account and credits.
+					{localAvailable
+						? "Segra is the best fit for most people. You can change this later in Settings."
+						: "Sign in once in your browser. Segra Desktop then uses your Segra account and credits."}
 				</p>
 			</div>
 
 			<div
-				className="mt-8 rounded-xl border border-primary/20 bg-primary/4 p-6 pb-8 ring-1 ring-primary/20 ring-inset"
+				className={cn(
+					"mt-8 rounded-xl border border-primary/20 bg-primary/4 p-6 pb-8 ring-1 ring-primary/20 ring-inset",
+				)}
 				data-onboarding-option="segra"
 			>
 				<SetupOptionHeader
+					accessory={
+						localAvailable ? (
+							<span className="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
+								Recommended
+							</span>
+						) : undefined
+					}
 					description={
-						<ul className="flex flex-col gap-1">
-							{SEGRA_SIGN_IN_BENEFITS.map((benefit) => (
-								<li className="flex gap-2" key={benefit}>
-									<Check
-										aria-hidden="true"
-										className="mt-0.5 size-3.5 shrink-0 text-primary"
-									/>
-									<span>{benefit}</span>
-								</li>
-							))}
-						</ul>
+						<OptionPoints
+							points={
+								localAvailable ? SEGRA_CLOUD_POINTS : SEGRA_SIGN_IN_BENEFITS
+							}
+						/>
 					}
 					icon={<ShieldCheck className="size-5" />}
-					title="Private by design"
+					title={localAvailable ? "Segra's secure cloud" : "Private by design"}
 				/>
 				<div className="mt-8 ml-12 flex flex-wrap items-center gap-1 max-[720px]:ml-0">
 					<Button
-						disabled={segraSignIn.signingIn}
+						disabled={segraSignIn.signingIn || startingLocal}
 						onClick={() => void segraSignIn.signIn()}
 						size="md"
 						tone="accent"
@@ -233,7 +301,11 @@ function ConnectStep({
 						{segraSignIn.signingIn && (
 							<Loader2 className="size-4 animate-spin" />
 						)}
-						{segraSignIn.signingIn ? "Waiting for browser..." : "Sign in"}
+						{segraSignIn.signingIn
+							? "Waiting for browser..."
+							: localAvailable
+								? "Sign in to Segra"
+								: "Sign in"}
 					</Button>
 					{segraSignIn.signingIn ? (
 						<Button
@@ -286,6 +358,40 @@ function ConnectStep({
 				.
 			</p>
 
+			{localAvailable && recommended ? (
+				<div
+					className="mt-6 flex items-start gap-3 rounded-xl border border-border p-4 max-[720px]:flex-col"
+					data-onboarding-option="local"
+				>
+					<span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-foreground/4 text-muted-foreground">
+						<HardDrive className="size-4" />
+					</span>
+					<div className="min-w-0 flex-1">
+						<h4 className="text-sm font-semibold text-foreground">
+							Or run it on this computer
+						</h4>
+						<p className="mt-1 text-xs text-muted-foreground">
+							{LOCAL_ONLY_NOTE}{" "}
+							{recommended.downloaded
+								? `${recommended.name} is already on this computer.`
+								: `Downloads ${recommended.name} (${formatBytes(recommended.bytes)}).`}
+						</p>
+					</div>
+					<Button
+						className="shrink-0"
+						disabled={startingLocal || segraSignIn.signingIn}
+						onClick={() => void useThisComputer()}
+						size="sm"
+						tone="neutral"
+						type="button"
+						variant="surface"
+					>
+						{startingLocal && <Loader2 className="size-4 animate-spin" />}
+						Use this computer
+					</Button>
+				</div>
+			) : null}
+
 			<div className="mt-5 flex justify-center">
 				<Button
 					onClick={onSkip}
@@ -294,7 +400,7 @@ function ConnectStep({
 					type="button"
 					variant="ghost"
 				>
-					Not now
+					Skip
 				</Button>
 			</div>
 		</OnboardingContent>
@@ -466,7 +572,7 @@ function DoneStep({
 				</h1>
 				{connection ? (
 					<p className="mt-3 text-md text-muted-foreground">
-						{connection.providerName} is connected.
+						{connection.message ?? `${connection.providerName} is connected.`}
 					</p>
 				) : null}
 				<Button

@@ -9,7 +9,7 @@ import {
 	TriangleAlert,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { EXTENSIONS_NOTE, PRIVATE_PROMISE } from "@/lib/privacy";
+import { EXTENSIONS_NOTE } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 import { PageFrame, PageHeader } from "../page-layout";
 
@@ -32,6 +32,10 @@ const SECTIONS: {
 		title: "Stays on this computer",
 		intro: "Stored and handled here. Nothing below is uploaded anywhere.",
 		items: [
+			{
+				title: "Models on this computer",
+				body: "With a model from On this computer, the AI itself runs here too. Your messages and files never leave this computer, and it works offline.",
+			},
 			{
 				title: "Chats and history",
 				body: "Every conversation is saved in Segra Desktop's folder on this computer. There is no cloud copy.",
@@ -134,6 +138,10 @@ const SECTIONS: {
 				title: "Updates and Marketplace",
 				body: "GitHub, to check for app updates and to load the Marketplace list.",
 			},
+			{
+				title: "Downloading local models",
+				body: "Hugging Face, once per model, to download its file. Nothing about your chats is sent.",
+			},
 		],
 	},
 ];
@@ -141,7 +149,10 @@ const SECTIONS: {
 export function PrivacyContent() {
 	return (
 		<PageFrame>
-			<PageHeader description={PRIVATE_PROMISE} title="Privacy" />
+			<PageHeader
+				description="Your chats and files stay on this computer. With a model on this computer, the AI runs here too. With Segra, what the AI needs to read goes only to sealed, secure hardware this computer checks first, where not even Segra can see it."
+				title="Privacy"
+			/>
 			<p className="-mt-4 mb-8 flex max-w-2xl items-start gap-2 text-sm text-muted-foreground">
 				<CloudOff aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
 				<span>

@@ -22,6 +22,8 @@ sidecar/
 ├── cloud-sessions.ts     # Cloud session REST client + Hub-proxy manager
 ├── cline-auth.ts         # Refresh-aware Cline auth token resolution
 ├── feature-flags.ts      # Cloud sessions gate (env override + settings toggle)
+├── local-models.ts       # Built-in local models: downloads, llama.cpp engine, loopback proxy
+├── local-models-commands.ts # local_model* commands + "On this computer" provider settings
 ├── session-data/         # Shared discovery, messages, artifacts, search helpers
 ├── paths.ts              # Path resolution
 ├── types.ts              # Shared types
@@ -149,7 +151,28 @@ await ctx.hubClient.command("schedule.list", { limit: 200 });
 - `pick_workspace_directory` — Uses macOS `osascript` / Linux `zenity` for directory picker
 - `open_mcp_settings_file` — Uses `open` / `xdg-open` to open files
 
-### 7. Frontend Connection
+### 7. Built-in Local Models — Loopback Proxy + On-demand Engine
+
+Onboarding offers local models and Segra as equal choices. The `segra-local` provider ("On this computer",
+catalog in `@cline/llms` `vendors/segra-local.ts`) runs a few preselected GGUF
+models with llama.cpp's `llama-server`, bundled as the resource folder
+`bin/llama` (staged by `scripts/fetch-llama-server.ts`; `SEGRA_LLAMA_DIR`
+points at it in packaged builds).
+
+- Agent runs happen in the Hub, which outlives the sidecar, so the provider's
+  address must not move: the sidecar serves an OpenAI-compatible proxy on
+  `127.0.0.1:3127` (any free port if taken; the provider's `baseUrl` follows).
+- The proxy starts `llama-server` for the requested model on the first
+  request and stops it after 5 idle minutes, so an open app holds no model in
+  memory. With the app closed, local models are unavailable.
+- Files live in the shared `<data dir>/segra/models` folder, so Segra
+  Meetings and this app download each model once. Meetings' old
+  `ai.segra.meetings/models/summary` folder is read too.
+- Starting a download saves the provider's settings (model), so the composer
+  can select it while it downloads; progress goes out as
+  `local_model_progress` events.
+
+### 8. Frontend Connection
 
 The frontend `desktop-client.ts` connects directly to the sidecar WebSocket:
 - Discovers endpoint from `window.__SIDECAR_WS_ENDPOINT__` or defaults to `ws://127.0.0.1:3126/transport`

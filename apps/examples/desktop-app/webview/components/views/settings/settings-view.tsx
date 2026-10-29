@@ -957,7 +957,7 @@ function GeneralSettingsContent({
 						</p>
 						<p className="text-sm text-muted-foreground">
 							Replay the first-run experience new users see when they open Segra
-							Code for the first time.
+							Desktop for the first time, including choosing where the AI runs.
 						</p>
 					</div>
 					<Button

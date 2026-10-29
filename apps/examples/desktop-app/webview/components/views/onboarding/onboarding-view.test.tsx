@@ -12,7 +12,11 @@ const { invoke, openExternalUrl } = vi.hoisted(() => ({
 	openExternalUrl: vi.fn(),
 }));
 vi.mock("@/lib/desktop-client", () => ({
-	desktopClient: { invoke, subscribe: vi.fn(() => () => {}) },
+	desktopClient: {
+		invoke,
+		subscribe: vi.fn(() => () => {}),
+		subscribeTransportState: vi.fn(() => () => {}),
+	},
 	openExternalUrl,
 }));
 
@@ -130,13 +134,103 @@ describe("OnboardingView", () => {
 		expect(buttonByText("Sign in")).toBeDefined();
 	});
 
+	describe("with the local model engine", () => {
+		const LOCAL_MODELS = {
+			models: [
+				{
+					id: "qwen3.5-4b",
+					name: "Qwen 3.5 4B",
+					description: "Fast.",
+					tier: "fast",
+					bytes: 2_740_937_888,
+					contextWindow: 32_768,
+					minMemoryGb: 8,
+					downloaded: false,
+					download: null,
+				},
+				{
+					id: "qwen3.5-9b",
+					name: "Qwen 3.5 9B",
+					description: "Balanced.",
+					tier: "balanced",
+					bytes: 5_680_522_464,
+					contextWindow: 32_768,
+					minMemoryGb: 16,
+					downloaded: false,
+					download: null,
+				},
+			],
+			recommendedId: "qwen3.5-9b",
+			memoryBytes: 32 * 1024 ** 3,
+			engine: { available: true, running: false, modelId: null, baseUrl: null },
+		};
+
+		beforeEach(() => {
+			const fallback = invoke.getMockImplementation();
+			invoke.mockImplementation(async (command: string, args?: unknown) => {
+				if (command === "local_models_list") return LOCAL_MODELS;
+				if (command === "local_model_download") return { started: true };
+				return fallback?.(command, args);
+			});
+		});
+
+		it("leads with Segra, and offers this computer below it with its trade-off", async () => {
+			await render();
+			await act(async () => {
+				buttonByText("Get started").click();
+			});
+
+			const options = Array.from(
+				container.querySelectorAll("[data-onboarding-option]"),
+			).map((option) => option.getAttribute("data-onboarding-option"));
+			expect(options).toEqual(["segra", "local"]);
+			const segra = container.querySelector('[data-onboarding-option="segra"]');
+			expect(segra?.textContent).toContain("Recommended");
+			expect(segra?.textContent).toContain("sealed, secure hardware (a TEE)");
+			const local = container.querySelector('[data-onboarding-option="local"]');
+			expect(local?.textContent).toContain("The most private option");
+			expect(local?.textContent).toContain("Downloads Qwen 3.5 9B (5.3 GB).");
+			expect(buttonByText("Sign in to Segra")).toBeDefined();
+			expect(buttonByText("Use this computer")).toBeDefined();
+		});
+
+		it("starts the recommended download and opens chats on it", async () => {
+			await render();
+			await act(async () => {
+				buttonByText("Get started").click();
+			});
+			await act(async () => {
+				buttonByText("Use this computer").click();
+			});
+
+			expect(invoke).toHaveBeenCalledWith("local_model_download", {
+				model: "qwen3.5-9b",
+			});
+			const selection = JSON.parse(
+				Object.values(
+					Object.fromEntries(
+						Array.from({ length: window.localStorage.length }, (_, i) => {
+							const key = window.localStorage.key(i) as string;
+							return [key, window.localStorage.getItem(key)];
+						}),
+					),
+				).find((value) => value?.includes("segra-local")) ?? "{}",
+			);
+			expect(selection.lastProvider).toBe("segra-local");
+			expect(selection.lastModelByProvider["segra-local"]).toBe("qwen3.5-9b");
+			// No history to import in this test, so it lands on the last step.
+			await act(async () => {});
+			expect(container.textContent).toContain("Qwen 3.5 9B is downloading.");
+		});
+	});
+
 	it("completes without connecting when skipped", async () => {
 		const onComplete = await render();
 		await act(async () => {
 			buttonByText("Get started").click();
 		});
 		await act(async () => {
-			buttonByText("Not now").click();
+			buttonByText("Skip").click();
 		});
 		expect(onComplete).toHaveBeenCalledTimes(1);
 	});

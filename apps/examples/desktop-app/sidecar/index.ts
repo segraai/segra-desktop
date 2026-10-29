@@ -26,6 +26,7 @@ import {
 	disposeSidecarContext,
 	initializeSessionManager,
 } from "./context";
+import { startLocalModels, stopLocalModels } from "./local-models-commands";
 import { createDesktopObservability } from "./observability";
 import { resolveWorkspaceRoot } from "./paths";
 import { startServer } from "./server";
@@ -124,6 +125,7 @@ async function main(desktopCliPath?: string) {
 		await withTimeout(
 			(async () => {
 				try {
+					await stopLocalModels().catch(() => undefined);
 					await disposeSidecarContext(ctx, reason);
 				} finally {
 					await observability.dispose();
@@ -170,6 +172,11 @@ async function main(desktopCliPath?: string) {
 	});
 
 	const { port, approvalToken } = startServer(ctx, SIDECAR_PORT, shutdown);
+	// Built-in local models: the loopback endpoint the hub calls. Best-effort,
+	// so a taken port or a missing engine never blocks the app.
+	startLocalModels(ctx).catch((error) => {
+		observability.logger.error?.("Local models failed to start", { error });
+	});
 	observability.logger.log("Desktop sidecar ready", {
 		port,
 		mode: SIDECAR_MODE,

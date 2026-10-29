@@ -33,6 +33,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useOAuthUserCode } from "@/hooks/use-oauth-user-code";
 import { openExternalUrl } from "@/lib/desktop-client";
+import { SEGRA_LOCAL_PROVIDER_ID } from "@/lib/local-models";
 import {
 	getProviderAuthKind,
 	isProviderConnected,
@@ -53,6 +54,7 @@ import type {
 import { SEGRA_PROVIDER_ID } from "@/lib/segra-models";
 import { cn } from "@/lib/utils";
 import { AudioModelBadges } from "./audio-model-badges";
+import { LocalModelsCard } from "./local-models-card";
 
 // Inputs nested inside a composed bordered box (icon + input + buttons in
 // one rounded frame) must strip the Input component's own chrome — border,
@@ -361,8 +363,11 @@ export function ProviderListContent({
 	const segraProvider = providers.find(
 		(provider) => provider.id === SEGRA_PROVIDER_ID,
 	);
+	// The built-in local models have their own card below Segra's.
 	const otherProviderList = providers.filter(
-		(provider) => provider.id !== SEGRA_PROVIDER_ID,
+		(provider) =>
+			provider.id !== SEGRA_PROVIDER_ID &&
+			provider.id !== SEGRA_LOCAL_PROVIDER_ID,
 	);
 	// Other providers start folded, unless there is no Segra card or one of
 	// them is already in use or open.
@@ -433,7 +438,7 @@ export function ProviderListContent({
 				</h1>
 				<p className="mt-3 text-base leading-6 text-muted-foreground">
 					{segraProvider
-						? "Segra keeps your work private. Other providers are optional."
+						? "Segra keeps your work private. For the most privacy, run a model on this computer instead."
 						: "Connect a provider to start using models."}
 				</p>
 			</div>
@@ -454,6 +459,8 @@ export function ProviderListContent({
 						selected={selectedProviderId === segraProvider.id}
 					/>
 				) : null}
+
+				<LocalModelsCard />
 
 				<button
 					aria-controls={othersContentId}

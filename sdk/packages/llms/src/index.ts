@@ -153,6 +153,15 @@ export {
 	SEGRA_PROVIDER_ID,
 } from "./providers/vendors/segra";
 export type { SegraAttestation } from "./providers/vendors/segra-attest";
+export {
+	getSegraLocalModel,
+	recommendSegraLocalModel,
+	SEGRA_LOCAL_DEFAULT_BASE_URL,
+	SEGRA_LOCAL_DEFAULT_PORT,
+	SEGRA_LOCAL_MODELS,
+	SEGRA_LOCAL_PROVIDER_ID,
+	type SegraLocalModel,
+} from "./providers/vendors/segra-local";
 export { LangfuseAttributesSpanProcessor } from "./services/LangfuseAttributesSpanProcessor";
 export {
 	disposeLangfuseTelemetry,

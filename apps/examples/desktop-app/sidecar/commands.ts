@@ -129,6 +129,10 @@ import {
 } from "./feature-flags";
 import { clearLegacyProviderCredentials } from "./legacy-provider-credentials";
 import {
+	handleLocalModelsCommand,
+	LOCAL_MODEL_COMMANDS,
+} from "./local-models-commands";
+import {
 	installMarketplaceEntryForDesktopCommand,
 	listMarketplaceInstalledEntries,
 	uninstallLocalPrimitive,
@@ -2858,6 +2862,11 @@ export async function handleCommand(
 		}
 		if (send) return { signedIn: true, sent: body };
 		return { signedIn: true, messages: body.messages ?? [] };
+	}
+
+	// Built-in local models (local-models.ts): download, list, delete.
+	if (LOCAL_MODEL_COMMANDS.has(command)) {
+		return await handleLocalModelsCommand(command, args);
 	}
 
 	// Per-reply TEE signature checks, newest first. The Segra provider runs in

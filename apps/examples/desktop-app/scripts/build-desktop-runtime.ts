@@ -5,6 +5,7 @@ import {
 	compileCliBinary,
 	installOpenTuiNativeVariants,
 } from "../../../cli/script/compile-binary";
+import { fetchLlamaServer } from "./fetch-llama-server";
 import { telemetryDefineArgs } from "./telemetry-define-args";
 
 // The desktop app ships two runtime artifacts and no app-specific executable:
@@ -187,6 +188,8 @@ const main = async () => {
 		await compileDesktopCli(targetTriple);
 	}
 	await buildRemoteClis();
+	// The local model engine (resource folder bin/llama); cached by version.
+	await fetchLlamaServer(targetTriple);
 };
 
 if (import.meta.main) {

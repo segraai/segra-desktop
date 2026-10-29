@@ -15,6 +15,14 @@ import type { SettingsSection } from "@/components/views/settings/sections";
 export const PRIVATE_PROMISE =
 	"Your chats and files stay on this computer. When the AI needs to read them, they go only to sealed, secure hardware that this computer checks first. No one can see inside it, not the company running it and not Segra.";
 
+/** Built-in local models: the model runs here (sidecar/local-models.ts). */
+export const LOCAL_PROMISE =
+	"Runs on this computer. Your chats, your files and the model all stay here, and nothing you type leaves it.";
+
+/** The one line that offers Segra next to local models. */
+export const SEGRA_ONE_LINER =
+	"Want more powerful models without the hardware? Use Segra. Your chats go only to sealed, secure hardware this computer checks first, so not even Segra can read them.";
+
 export const NOT_PRIVATE_PROMISE = (providerName: string) =>
 	`Your messages and the files the agent reads are sent to ${providerName}'s servers, which can read them and may keep them under their own terms.`;
 

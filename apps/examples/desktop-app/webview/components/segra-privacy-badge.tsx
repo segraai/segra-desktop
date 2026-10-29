@@ -273,18 +273,23 @@ export function isLoopbackUrl(url: string | undefined): boolean {
 export function ProviderPrivacyBadge({
 	providerName,
 	local,
+	summary: summaryOverride,
 }: {
 	providerName: string;
 	local: boolean;
+	/** Replaces the generic text, e.g. for the built-in local models. */
+	summary?: string;
 }) {
 	const Icon = local ? HardDrive : ShieldAlert;
 	const label = local ? "On this computer" : "Not private";
 	const tone = local
 		? "text-muted-foreground"
 		: "text-amber-600 dark:text-amber-400";
-	const summary = local
-		? `${providerName} runs at an address on this computer, so models it runs locally keep your messages and files here. Some local apps can also forward to online models (like Ollama's cloud models), which then see them.`
-		: NOT_PRIVATE_PROMISE(providerName);
+	const summary =
+		summaryOverride ??
+		(local
+			? `${providerName} runs at an address on this computer, so models it runs locally keep your messages and files here. Some local apps can also forward to online models (like Ollama's cloud models), which then see them.`
+			: NOT_PRIVATE_PROMISE(providerName));
 	return (
 		<Popover>
 			<PopoverTrigger asChild>

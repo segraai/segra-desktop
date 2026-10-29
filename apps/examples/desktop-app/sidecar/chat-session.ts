@@ -63,6 +63,10 @@ import {
 import { isCloudAgentsEnabled } from "./feature-flags";
 import { readSessionManifest, sharedSessionDataDir } from "./paths";
 import { runPluginSlashCommand } from "./plugin-commands";
+import {
+	buildLocalModelSystemPrompt,
+	isLocalModelProvider,
+} from "./local-model-prompt";
 import { derivePromptFromMessages } from "./session-data/common";
 import { persistSessionMessages } from "./session-data/messages";
 import type {
@@ -713,6 +717,10 @@ function buildCoreSessionConfig(
 		systemPrompt: config.systemPrompt ?? config.system_prompt ?? "",
 		maxIterations: config.maxIterations ?? config.max_iterations,
 		enableTools: config.enableTools ?? config.enable_tools ?? true,
+		// Local models get a lean tool set (sidecar/local-model-prompt.ts).
+		...(isLocalModelProvider(config.provider ?? config.providerId)
+			? { enableSpawnAgent: false, enableAgentTeams: false }
+			: {}),
 		...(thinking !== undefined ? { thinking } : {}),
 		...(reasoningEffort ? { reasoningEffort } : {}),
 		...(thinkingBudgetTokens !== undefined ? { thinkingBudgetTokens } : {}),
@@ -860,16 +868,28 @@ async function resolveSystemPrompt(config: JsonRecord): Promise<string> {
 	const cwd = String(
 		config.cwd ?? config.workspaceRoot ?? config.workspace_root ?? "",
 	).trim();
-	if (!cwd) {
-		return String(config.systemPrompt ?? config.system_prompt ?? "").trim();
-	}
 	const providerId = String(config.provider ?? config.providerId ?? "").trim();
 	const mode = resolveDesktopSessionMode(config);
-	const metadata = await consumeWorkspaceMetadata(cwd);
 	const inlineRules =
 		typeof config.rules === "string" && config.rules.trim().length > 0
 			? config.rules
 			: undefined;
+	// Also for pathless chats, which would otherwise get the SDK's full prompt.
+	if (
+		isLocalModelProvider(providerId) &&
+		!readExplicitSystemPrompt(config).trim()
+	) {
+		return buildLocalModelSystemPrompt({
+			cwd,
+			mode,
+			platform: process.platform || "unknown",
+			rules: inlineRules,
+		});
+	}
+	if (!cwd) {
+		return String(config.systemPrompt ?? config.system_prompt ?? "").trim();
+	}
+	const metadata = await consumeWorkspaceMetadata(cwd);
 	return buildClineSystemPrompt({
 		ide: "Terminal Shell",
 		workspaceRoot: cwd,
