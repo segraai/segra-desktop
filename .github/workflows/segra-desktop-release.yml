@@ -96,26 +96,37 @@ jobs:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
       - run: bun install
       - run: bun run build:sdk
-      - name: Write App Store Connect API key (when notarizing)
+      # Tauri tries to sign whenever APPLE_CERTIFICATE is set, even to "", so
+      # an unset secret must not reach the build as an empty variable (0.0.49
+      # failed with "failed to import keychain certificate"). Export only the
+      # Apple values that exist.
+      - name: Export Apple signing settings (when present)
         env:
-          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
-        run: |
-          if [ -n "$APPLE_API_KEY_CONTENT" ]; then
-            printf "%s" "$APPLE_API_KEY_CONTENT" > "$RUNNER_TEMP/AuthKey.p8"
-            echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
-          else
-            echo "::warning::No Apple signing secrets: building an unsigned, unnotarized app."
-          fi
-      - name: Build bundle
-        working-directory: apps/examples/desktop-app
-        run: bunx tauri build --target universal-apple-darwin --config src-tauri/tauri.release.conf.json
-        env:
-          # Empty Apple values make Tauri skip signing and notarization.
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+        run: |
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_API_KEY APPLE_API_ISSUER; do
+            value="${!name}"
+            if [ -n "$value" ]; then
+              { echo "$name<<APPLE_EOF"; echo "$value"; echo "APPLE_EOF"; } >> "$GITHUB_ENV"
+            fi
+          done
+          if [ -n "$APPLE_API_KEY_CONTENT" ]; then
+            printf "%s" "$APPLE_API_KEY_CONTENT" > "$RUNNER_TEMP/AuthKey.p8"
+            echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+          fi
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "::warning::No Apple signing secrets: building an ad-hoc signed, unnotarized app."
+          fi
+      - name: Build bundle
+        working-directory: apps/examples/desktop-app
+        run: bunx tauri build --target universal-apple-darwin --config src-tauri/tauri.release.conf.json
+        env:
+          # Apple signing values come from the export step above.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # Keep the DMG layout from tauri.conf.json (the bundler skips it when CI=true).
