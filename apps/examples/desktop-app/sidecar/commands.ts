@@ -8,6 +8,7 @@ import {
 	realpathSync,
 	rmSync,
 	statSync,
+	writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
 import {
@@ -167,6 +168,12 @@ import {
 import { getPullRequestStatus } from "./pull-request";
 import { capturePullRequestEvent } from "./pull-request-telemetry";
 import { resolveDesktopRemoteHelper } from "./remote-helper";
+import {
+	defaultSaveDirectory,
+	pickSavePath,
+	SavePickerUnavailableError,
+	uniqueSavePath,
+} from "./save-file-picker";
 import { listSessionAgents } from "./session-data/agents";
 import { readSessionHooks } from "./session-data/artifacts";
 import {
@@ -194,6 +201,13 @@ import { pickWorkspaceDirectory } from "./workspace-picker";
 
 // Upstream Cline account providers, hidden from Segra Desktop's provider list.
 const SEGRA_HIDDEN_PROVIDER_IDS = new Set(["cline", "cline-pass"]);
+
+const SAVE_IMAGE_EXTENSIONS: Record<string, string> = {
+	"image/png": "png",
+	"image/jpeg": "jpg",
+	"image/gif": "gif",
+	"image/webp": "webp",
+};
 
 // All child processes in this module run asynchronously: the sidecar is a
 // single event loop shared by every UI command and streaming chat session, so
@@ -2781,13 +2795,14 @@ export async function handleCommand(
 	}
 
 	// ── Segra account ──────────────────────────────────────────────────
-	// The signed-in Segra user's balance, for the sidebar footer. Signed out
-	// or unreachable is a normal state: return null instead of throwing.
+	// The signed-in Segra user's balance, for the sidebar footer and Settings →
+	// Account. Signed out or unreachable is a normal state: return null instead
+	// of throwing. `signedIn` tells the two apart.
 	if (command === "segra_account") {
 		const manager = new ProviderSettingsManager();
 		const settings = manager.getProviderSettings("segra");
 		const apiKey = getPersistedProviderApiKey("segra", settings);
-		if (!apiKey) return { account: null };
+		if (!apiKey) return { account: null, signedIn: false };
 		try {
 			const response = await fetch(
 				`${resolveSegraBaseUrl(settings?.baseUrl)}/me`,
@@ -2796,12 +2811,12 @@ export async function handleCommand(
 					signal: AbortSignal.timeout(10_000),
 				},
 			);
-			if (!response.ok) return { account: null };
+			if (!response.ok) return { account: null, signedIn: true };
 			// Free Pro credits are requested on the Segra website, at the API's origin.
 			const proUrl = `${new URL(resolveSegraBaseUrl(settings?.baseUrl)).origin}/pro`;
-			return { account: await response.json(), proUrl };
+			return { account: await response.json(), proUrl, signedIn: true };
 		} catch {
-			return { account: null };
+			return { account: null, signedIn: true };
 		}
 	}
 
@@ -3295,6 +3310,33 @@ export async function handleCommand(
 		}
 		setAutoUpdateEnabledGlobally(args.auto_update_enabled);
 		return readGlobalSettings();
+	}
+	// Save as… for a chat image: asks where with the system dialog, or saves
+	// to Downloads when no dialog can open.
+	if (command === "save_image") {
+		const data = String(args?.data ?? "");
+		const extension = SAVE_IMAGE_EXTENSIONS[String(args?.mediaType ?? "")];
+		if (!data || !extension) throw new Error("Not a supported image.");
+		const stem =
+			String(args?.name ?? "")
+				.replace(/\.[a-z0-9]+$/i, "")
+				.replace(/[^\w\- ]+/g, "")
+				.trim()
+				.slice(0, 80) || "image";
+		const suggestedName = `${stem}.${extension}`;
+		const bytes = Buffer.from(data, "base64");
+		let path: string | null;
+		let fallback = false;
+		try {
+			path = await pickSavePath(suggestedName);
+		} catch (error) {
+			if (!(error instanceof SavePickerUnavailableError)) throw error;
+			path = uniqueSavePath(defaultSaveDirectory(), suggestedName);
+			fallback = true;
+		}
+		if (!path) return { cancelled: true };
+		writeFileSync(path, bytes);
+		return { path, fallback };
 	}
 	if (command === "export_diagnostics") {
 		const sessionIds = Array.isArray(args?.sessionIds)

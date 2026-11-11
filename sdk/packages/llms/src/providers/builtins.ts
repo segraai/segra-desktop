@@ -470,6 +470,27 @@ function buildSegraLocalModels(): Record<string, ModelInfo> {
 	);
 }
 
+// NEAR AI Cloud's image models are missing from the generated catalog, and
+// NEAR's own /v1/models lists FLUX.2 [klein] as text-only, though it also
+// edits: /v1/images/edits takes the input image.
+function buildNearAiModels(): Record<string, ModelInfo> {
+	return {
+		...generatedModels("nearai"),
+		"black-forest-labs/FLUX.2-klein-4B": {
+			id: "black-forest-labs/FLUX.2-klein-4B",
+			name: "FLUX.2 [klein] 4B",
+			description:
+				"Black Forest Labs' fast image model: makes images from a description, or edits an attached one.",
+			family: "flux",
+			operation: "image-generation",
+			modalities: {
+				input: ["text", "image"],
+				output: ["image"],
+			},
+		},
+	};
+}
+
 function buildOpenAICodexModels(): Record<string, ModelInfo> {
 	return filterOpenAICodexModels(generatedModels("openai-native"));
 }
@@ -796,6 +817,13 @@ const OPENAI_COMPATIBLE_SPEC_OVERRIDES: BuiltinSpecOverride[] = [
 		name: "CoreWeave",
 		description: "CoreWeave Serverless Inference",
 		docsUrl: "https://docs.wandb.ai/inference/",
+	},
+	{
+		id: "nearai",
+		name: "NEAR AI",
+		description:
+			"Private models running in TEEs on NEAR AI Cloud, including image generation and editing.",
+		modelsFactory: buildNearAiModels,
 	},
 	{
 		id: "opencode-go",

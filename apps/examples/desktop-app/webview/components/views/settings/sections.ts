@@ -6,6 +6,7 @@
  */
 
 const ALL_SETTINGS_SECTIONS = [
+	"Account",
 	"General",
 	"Privacy",
 	"Providers",

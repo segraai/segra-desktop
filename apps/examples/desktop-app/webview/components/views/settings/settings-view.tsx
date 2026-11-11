@@ -46,6 +46,7 @@ import type {
 	ProviderModelsResponse,
 	ProviderSettingsUpdate,
 } from "@/lib/provider-schema";
+import { SEGRA_PROVIDER_ID } from "@/lib/segra-models";
 import {
 	type HubAccent,
 	type HubTheme,
@@ -62,6 +63,7 @@ import {
 } from "../marketplace-explorer-view";
 import { PageFrame, PageHeader } from "../page-layout";
 import { AboutContent } from "./about-view";
+import { AccountContent } from "./account-view";
 import { AddProviderContent, type AddProviderPayload } from "./add-provider";
 import { ChannelsContent } from "./channels-view";
 import { CustomizeView } from "./customize-view";
@@ -610,6 +612,10 @@ export function SettingsView({
 				{providerContent}
 				{addProviderDialog}
 			</>
+		) : activeNav === "Account" ? (
+			<AccountContent
+				onManageSegra={() => openProviderDetail(SEGRA_PROVIDER_ID)}
+			/>
 		) : activeNav === "Privacy" ? (
 			<PrivacyContent />
 		) : activeNav === "Voice" ? (

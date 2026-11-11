@@ -369,10 +369,9 @@ describe("ChatMessages tool disclosures", () => {
 		expect(image?.src).toBe(`data:image/png;base64,${screenshotData}`);
 
 		await act(async () => image?.closest("button")?.click());
+		// The viewer covers the whole window, so it renders on <body>.
 		expect(
-			container.querySelector(
-				'[role="dialog"][aria-label="Expanded attachment"]',
-			),
+			document.body.querySelector('[role="dialog"][aria-label="Image viewer"]'),
 		).not.toBeNull();
 	});
 
@@ -1647,20 +1646,16 @@ describe("ChatMessages image attachments", () => {
 		await act(async () => expand?.click());
 
 		expect(
-			container.querySelector(
-				'[role="dialog"][aria-label="Expanded attachment"]',
-			),
+			document.body.querySelector('[role="dialog"][aria-label="Image viewer"]'),
 		).not.toBeNull();
 		expect(
-			container.querySelector<HTMLImageElement>(
-				'img[alt="Expanded attachment"]',
-			)?.src,
+			document.body.querySelector<HTMLImageElement>('img[alt="Expanded"]')?.src,
 		).toBe("data:image/png;base64,aGVsbG8=");
 
 		await act(async () => {
 			window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
 		});
-		expect(container.querySelector('[role="dialog"]')).toBeNull();
+		expect(document.body.querySelector('[role="dialog"]')).toBeNull();
 	});
 });
 

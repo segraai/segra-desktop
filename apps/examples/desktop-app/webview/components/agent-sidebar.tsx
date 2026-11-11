@@ -11,6 +11,7 @@ import {
 	ArrowRight,
 	Blocks,
 	ChevronDown,
+	CircleUserRound,
 	Clock3,
 	Cloud,
 	Filter,
@@ -155,6 +156,7 @@ function hubPort(url: string | null): string | null {
 }
 
 const SETTINGS_SECTION_ICONS = {
+	Account: CircleUserRound,
 	General: SlidersHorizontal,
 	Privacy: ShieldCheck,
 	Providers: Plug,

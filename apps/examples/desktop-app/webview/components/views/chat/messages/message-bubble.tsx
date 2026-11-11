@@ -22,10 +22,11 @@ import {
 	resolveCredentialFailureAction,
 	segraBillingFailure,
 } from "@/hooks/chat-session/helpers";
-import type {
-	ChatMessage,
-	ChatMessageImage,
-	ChatMessageMedia,
+import {
+	type ChatMessage,
+	type ChatMessageImage,
+	ChatMessageImageSchema,
+	type ChatMessageMedia,
 } from "@/lib/chat-schema";
 import { openExternalUrl } from "@/lib/desktop-client";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,7 @@ import { MemoizedMarkdown } from "../../../ui/markdown";
 import { formatChatMessageContent } from "../message-content";
 import { isSystemSteeringMessage } from "./group-messages";
 import { MessageImageCarousel } from "./image-carousel";
+import { ImageContextMenu } from "./image-lightbox";
 import { ReasoningBlock } from "./reasoning-block";
 
 function MessageImages({
@@ -53,43 +55,85 @@ function MessageImages({
 	return (
 		<div className="grid max-w-2xl gap-2">
 			{images.map((image, index) => (
-				<button
-					aria-label={`Expand attachment ${index + 1}`}
-					className="cursor-zoom-in overflow-hidden rounded-lg border border-border bg-muted text-left transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					key={image.id}
-					onClick={() => onExpandImage?.(image)}
-					type="button"
-				>
-					{/* biome-ignore lint/performance/noImgElement: In-memory data URLs do not have dimensions and cannot use Next's optimizer. */}
-					<img
-						alt={`Attachment ${index + 1}`}
-						className="max-h-56.25 max-w-56.25 object-contain"
-						src={`data:${image.mediaType};base64,${image.data}`}
-					/>
-				</button>
+				<ImageContextMenu image={image} key={image.id}>
+					<button
+						aria-label={`Expand attachment ${index + 1}`}
+						className="cursor-zoom-in overflow-hidden rounded-lg border border-border bg-muted text-left transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						onClick={() => onExpandImage?.(image)}
+						type="button"
+					>
+						{/* biome-ignore lint/performance/noImgElement: In-memory data URLs do not have dimensions and cannot use Next's optimizer. */}
+						<img
+							alt={`Attachment ${index + 1}`}
+							className="max-h-56.25 max-w-56.25 object-contain"
+							src={`data:${image.mediaType};base64,${image.data}`}
+						/>
+					</button>
+				</ImageContextMenu>
 			))}
 		</div>
 	);
 }
 
-function MessageMedia({ media }: { media: ChatMessageMedia[] }) {
+// Generated images carried inline open in the viewer and can be saved.
+function inlineImage(media: ChatMessageMedia): ChatMessageImage | null {
+	if (media.modality !== "image" || media.source.type !== "base64") return null;
+	const parsed = ChatMessageImageSchema.safeParse({
+		id: media.id,
+		mediaType: media.mediaType,
+		data: media.source.data,
+	});
+	return parsed.success ? parsed.data : null;
+}
+
+function MessageMedia({
+	media,
+	onExpandImage,
+}: {
+	media: ChatMessageMedia[];
+	onExpandImage?: (image: ChatMessageImage) => void;
+}) {
 	return (
 		<div className="flex max-w-2xl flex-col gap-2">
-			{media.map((item) => (
-				<GeneratedMediaContent
-					classNames={{
-						image:
-							"max-h-96 max-w-full rounded-lg border border-border bg-muted object-contain",
-						audio: "w-full",
-						video: "max-h-96 max-w-full rounded-lg",
-						file: "text-sm underline",
-						unavailable: "rounded-lg border border-border bg-muted p-3 text-sm",
-					}}
-					key={item.id}
-					media={item}
-				/>
-			))}
+			{media.map((item) => {
+				const image = inlineImage(item);
+				return image ? (
+					<ImageContextMenu image={image} key={item.id}>
+						<button
+							aria-label="Expand generated image"
+							className="w-fit cursor-zoom-in overflow-hidden rounded-lg border border-border bg-muted transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							onClick={() => onExpandImage?.(image)}
+							type="button"
+						>
+							{/* biome-ignore lint/performance/noImgElement: In-memory data URLs do not have dimensions and cannot use Next's optimizer. */}
+							<img
+								alt={item.name ?? "Generated image"}
+								className="max-h-96 max-w-full object-contain"
+								src={`data:${image.mediaType};base64,${image.data}`}
+							/>
+						</button>
+					</ImageContextMenu>
+				) : (
+					<MediaItem item={item} key={item.id} />
+				);
+			})}
 		</div>
+	);
+}
+
+function MediaItem({ item }: { item: ChatMessageMedia }) {
+	return (
+		<GeneratedMediaContent
+			classNames={{
+				image:
+					"max-h-96 max-w-full rounded-lg border border-border bg-muted object-contain",
+				audio: "w-full",
+				video: "max-h-96 max-w-full rounded-lg",
+				file: "text-sm underline",
+				unavailable: "rounded-lg border border-border bg-muted p-3 text-sm",
+			}}
+			media={item}
+		/>
 	);
 }
 
@@ -265,7 +309,9 @@ export const MessageBubble = memo(function MessageBubble({
 					/>
 				) : null}
 
-				{message.media?.length ? <MessageMedia media={message.media} /> : null}
+				{message.media?.length ? (
+					<MessageMedia media={message.media} onExpandImage={onExpandImage} />
+				) : null}
 
 				{displayContent ? (
 					<div className="min-w-0 max-w-full wrap-break-word">

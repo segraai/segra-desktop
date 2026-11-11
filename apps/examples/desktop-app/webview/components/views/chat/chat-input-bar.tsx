@@ -2145,6 +2145,29 @@ const ModelSelector = memo(function ModelSelector({
 					}
 					return Array.from(nextProviderIds);
 				});
+				// Providers whose models are only listed live (Segra fetches its
+				// list from its server) have none in the catalog, so the picker
+				// would skip them unless they're the current one. Load those so
+				// every signed-in provider shows up.
+				if (!includeCloudModels) {
+					for (const entry of payload.providers ?? []) {
+						if (
+							!entry.enabled ||
+							entry.configured === false ||
+							entry.id === normalizedProvider ||
+							(payload.providerModels[entry.id]?.length ?? 0) > 0
+						) {
+							continue;
+						}
+						void loadProviderModels(entry.id)
+							.then((models) => {
+								if (!cancelled && models.length > 0) {
+									applyProviderModels(entry.id, models);
+								}
+							})
+							.catch(() => undefined);
+					}
+				}
 			} catch {
 				if (!cancelled) setReasoningCapabilitySource("fallback");
 			}

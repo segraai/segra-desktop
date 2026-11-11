@@ -88,7 +88,25 @@ describe("SegraBalance", () => {
 			credits: 0,
 			status: "empty",
 		});
-		expect(container.querySelector("button")).toBeNull();
+		expect(button("Try Pro")).toBeUndefined();
+		expect(container.textContent).toBe("Balance used up");
+	});
+
+	it("reloads the balance when refresh is clicked", async () => {
+		await renderWith({
+			billing: "wallet",
+			userId: "u",
+			tier: "paid",
+			credits: 5,
+			status: "ok",
+		});
+		const calls = invoke.mock.calls.length;
+		await act(async () => {
+			container
+				.querySelector<HTMLButtonElement>('[aria-label="Refresh credits"]')
+				?.click();
+		});
+		expect(invoke.mock.calls.length).toBe(calls + 1);
 	});
 
 	it("shows nothing for an account without a credit balance", async () => {

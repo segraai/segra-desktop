@@ -2327,6 +2327,80 @@ describe("ChatInputBar", () => {
 		expect(optionLabels[2]).toContain("Other Model");
 	});
 
+	it("lists signed-in providers whose models only load live, like Segra", async () => {
+		loadProviderModelCatalogMock.mockResolvedValue({
+			providers: [
+				{ id: "deepseek", name: "DeepSeek", enabled: true, configured: true },
+				{ id: "segra", name: "Segra", enabled: true, configured: true },
+				{ id: "groq", name: "Groq", enabled: false },
+			],
+			enabledProviderIds: ["deepseek"],
+			providerModels: { deepseek: ["deepseek-chat"], segra: [], groq: [] },
+			providerModelDetails: {},
+			providerNames: { deepseek: "DeepSeek", segra: "Segra", groq: "Groq" },
+			providerReasoningModels: {},
+		});
+		loadProviderModelsMock.mockImplementation(async (providerId: string) =>
+			providerId === "segra" ? [{ id: "segra/glm", name: "GLM" }] : [],
+		);
+
+		await act(async () => {
+			root.render(
+				<WorkspaceProvider value={workspaceValue}>
+					<ChatInputBar
+						attachments={[]}
+						gitBranch="main"
+						mode="act"
+						model="deepseek-chat"
+						onAbort={vi.fn()}
+						onAttachFiles={vi.fn()}
+						onEditPromptInQueue={vi.fn()}
+						onListGitBranches={vi.fn(async () => ({
+							current: "main",
+							branches: ["main"],
+						}))}
+						onModeToggle={vi.fn()}
+						onModelChange={vi.fn()}
+						onOpenModelSettings={vi.fn()}
+						onPromptInputChange={vi.fn()}
+						onProviderChange={vi.fn()}
+						onReasoningChange={vi.fn()}
+						onRemoveAttachment={vi.fn()}
+						onRemovePromptInQueue={vi.fn()}
+						onSend={vi.fn()}
+						onSteerPromptInQueue={vi.fn()}
+						onSwitchGitBranch={vi.fn(async () => true)}
+						promptDraft={{ version: 0, value: "" }}
+						promptsInQueue={[]}
+						provider="deepseek"
+						reasoningEffort="low"
+						status="idle"
+						summary={{ toolCalls: 0, tokensIn: 0, tokensOut: 0 }}
+						thinking={false}
+					/>
+				</WorkspaceProvider>,
+			);
+			await Promise.resolve();
+		});
+		const providerTrigger = container.querySelector<HTMLButtonElement>(
+			'[aria-label^="Provider:"]',
+		);
+		await vi.waitFor(() => {
+			expect(providerTrigger?.textContent).toContain("DeepSeek");
+		});
+		expect(loadProviderModelsMock).toHaveBeenCalledWith("segra");
+		expect(loadProviderModelsMock).not.toHaveBeenCalledWith("groq");
+
+		await act(async () => providerTrigger?.click());
+		const panel = document.querySelector('[role="dialog"]');
+		const labels = [...(panel?.querySelectorAll('[role="option"]') ?? [])].map(
+			(option) => option.textContent,
+		);
+		expect(labels).toContain("DeepSeek");
+		expect(labels).toContain("Segra");
+		expect(labels).not.toContain("Groq");
+	});
+
 	it("opens model settings from the provider picker's set-up row", async () => {
 		loadProviderModelCatalogMock.mockResolvedValue({
 			providers: [],

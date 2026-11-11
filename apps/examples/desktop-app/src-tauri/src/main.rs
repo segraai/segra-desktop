@@ -128,7 +128,8 @@ struct UpdateState {
     // Update::install launches the NSIS installer and std::process::exit(0)s
     // immediately; on Linux (deb/rpm) it runs `pkexec dpkg -i` / `rpm -U`,
     // which pops a root password prompt. Either way installation must wait
-    // for the user-initiated restart instead of running inside the
+    // for the user-initiated restart (or quit, see
+    // install_staged_update_on_quit) instead of running inside the
     // background cycle like it does on macOS.
     #[cfg(not(target_os = "macos"))]
     pending_install: Mutex<Option<(tauri_plugin_updater::Update, Vec<u8>)>>,
@@ -973,6 +974,46 @@ fn apply_staged_update(app: &tauri::AppHandle) {
     app.restart();
 }
 
+/// Windows and Linux: install an update that finished downloading but was
+/// never applied because the user quit instead of clicking "Restart now".
+/// The staged bytes only live in memory, so without this the next launch is
+/// still the old version and downloads the update again. Runs after the
+/// backend has stopped, so the bundled CLI is no longer locked.
+#[cfg(not(target_os = "macos"))]
+fn install_staged_update_on_quit(app: &tauri::AppHandle) {
+    let Some(update_state) = app.try_state::<Arc<UpdateState>>() else {
+        return;
+    };
+    let Some((update, bytes)) = update_state
+        .pending_install
+        .lock()
+        .ok()
+        .and_then(|mut pending| pending.take())
+    else {
+        return;
+    };
+    // Update::install would pass the NSIS installer /R, which reopens the
+    // app the user just quit. The updater artifact is the signed setup.exe
+    // itself (createUpdaterArtifacts: true), already verified by download(),
+    // so run it directly: /P shows only a progress bar, /UPDATE keeps the
+    // existing install's settings.
+    #[cfg(target_os = "windows")]
+    {
+        let installer = std::env::temp_dir()
+            .join(format!("Segra-Desktop_{}_x64-setup.exe", update.version));
+        let result = fs::write(&installer, &bytes)
+            .and_then(|()| Command::new(&installer).args(["/P", "/UPDATE"]).spawn());
+        if let Err(error) = result {
+            eprintln!("[updater] failed to start the installer on quit: {error}");
+        }
+    }
+    // deb/rpm through pkexec, which asks for the password once.
+    #[cfg(not(target_os = "windows"))]
+    if let Err(error) = update.install(bytes) {
+        eprintln!("[updater] failed to install the update on quit: {error}");
+    }
+}
+
 /// Relaunch the current version of the app. Used after the sidecar replaces
 /// the shared Cline Hub under the running app (the "Cline Hub update
 /// required" flow): a fresh launch attaches everything to the new Hub instead
@@ -1676,6 +1717,10 @@ fn main() {
                     .state::<Arc<DesktopBackendState>>()
                     .inner()
                     .stop();
+                #[cfg(not(target_os = "macos"))]
+                if matches!(event, RunEvent::Exit) {
+                    install_staged_update_on_quit(app_handle);
+                }
             }
             _ => {}
         });
