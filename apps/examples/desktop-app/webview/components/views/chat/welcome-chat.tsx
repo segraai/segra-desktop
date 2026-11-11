@@ -16,6 +16,8 @@ import { useAccount } from "@/contexts/account-context";
 import { useWorkspace } from "@/contexts/workspace-context";
 import { isAgendaTaskExpired, useAgendaTasks } from "@/hooks/use-agenda-tasks";
 import { useClineSignIn } from "@/hooks/use-cline-sign-in";
+import { useIsAccountantMode } from "@/lib/app-mode";
+import { useTerms } from "@/lib/app-terms";
 import { openPersonalGitHubInstallUrl } from "@/lib/cline-integrations";
 import {
 	type CloudBranchListOptions,
@@ -31,6 +33,7 @@ import { desktopClient } from "@/lib/desktop-client";
 import { AGENDA_UI_ENABLED } from "@/lib/feature-flags";
 import { invalidateProviderCatalogCache } from "@/lib/provider-model-catalog";
 import type { WorkIn } from "@/lib/work-in-selection";
+import { AccountantStarters } from "./accountant-starters";
 import {
 	CloudOnboardingCard,
 	type CloudOnboardingVariant,
@@ -70,15 +73,16 @@ export function WelcomeScreen({
 	gitBranch,
 	onListGitBranches,
 	onSwitchGitBranch,
-	executionTarget = "local",
+	executionTarget: executionTargetProp = "local",
 	repoUrl = "",
 	cloudBranch = "",
 	onRepoUrlChange = noop,
 	onCloudBranchChange = noop,
-	cloudAgentsEnabled = false,
+	cloudAgentsEnabled: cloudAgentsEnabledProp = false,
 	workIn,
 	onWorkInChange,
 	onOpenSession,
+	onSelectAccountantStarter,
 }: {
 	active: boolean;
 	body: ReactNode;
@@ -99,7 +103,17 @@ export function WelcomeScreen({
 	workIn?: WorkIn;
 	onWorkInChange?: (next: WorkIn) => void;
 	onOpenSession?: (sessionId: string) => void | Promise<void>;
+	/**
+	 * Accountant mode: called with a starter's prompt when its card is clicked.
+	 * The parent should put the text in the composer without sending it.
+	 */
+	onSelectAccountantStarter?: (prompt: string) => void;
 }) {
+	const accountantMode = useIsAccountantMode();
+	const terms = useTerms();
+	// Accountant mode is local-only whatever the props say.
+	const executionTarget = accountantMode ? "local" : executionTargetProp;
+	const cloudAgentsEnabled = accountantMode ? false : cloudAgentsEnabledProp;
 	const { user, activeOrganization, refreshAccount } = useAccount();
 	const cloudScope = user
 		? JSON.stringify([
@@ -461,7 +475,7 @@ export function WelcomeScreen({
 			hideWelcomeComposer={showCloudOnboarding}
 			welcomeHeader={
 				<div className="cline-view-enter">
-					<h1 className="sr-only">What would you like to build?</h1>
+					<h1 className="sr-only">{terms.welcomeHeading}</h1>
 					<SegraWelcomeHero />
 
 					<div className="mt-11 flex min-w-0 items-center gap-2">
@@ -522,6 +536,12 @@ export function WelcomeScreen({
 			}
 			welcomeFooter={
 				<>
+					{active && accountantMode ? (
+						<AccountantStarters
+							className="cline-view-enter mt-6"
+							onSelect={(prompt) => onSelectAccountantStarter?.(prompt)}
+						/>
+					) : null}
 					{active && AGENDA_UI_ENABLED ? (
 						<>
 							<AgentQuickActions

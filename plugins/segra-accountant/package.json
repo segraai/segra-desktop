@@ -1,0 +1,30 @@
+{
+	"name": "segra-accountant",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"cline": {
+		"plugins": [
+			{
+				"paths": ["./index.ts"],
+				"capabilities": ["tools"]
+			}
+		]
+	},
+	"peerDependencies": {
+		"@cline/core": "*"
+	},
+	"peerDependenciesMeta": {
+		"@cline/core": {
+			"optional": true
+		}
+	},
+	"dependencies": {
+		"exceljs": "^4.4.0",
+		"pdfjs-dist": "6.4.299",
+		"tesseract.js": "^7.0.0"
+	},
+	"devDependencies": {
+		"pdf-lib": "^1.17.1"
+	}
+}

@@ -151,6 +151,8 @@ beforeEach(() => {
 		});
 	}
 	window.localStorage.clear();
+	// Existing tests describe developer mode; accountant mode has its own suite.
+	window.localStorage.setItem("segra.app-mode.v1", "developer");
 	invoke.mockReset();
 	invoke.mockRejectedValue(new Error("No Cline account auth token found"));
 	desktopMocks.subscribe.mockReset();
@@ -1398,5 +1400,103 @@ describe("AgentSidebar session organization", () => {
 		});
 		expect(heading()?.getAttribute("aria-expanded")).toBe("true");
 		expect(container.querySelector('[aria-label="General"]')).not.toBeNull();
+	});
+});
+
+describe("AgentSidebar accountant mode", () => {
+	const renderSidebar = async (
+		mode: "accountant" | "developer",
+		threads: SessionThread[] = [],
+		props: { view?: "chat" | "settings"; section?: "Customize" } = {},
+	) => {
+		window.localStorage.setItem("segra.app-mode.v1", mode);
+		window.localStorage.setItem("segra.sidebar.settings-open", "1");
+		await act(async () => {
+			root.render(
+				<SidebarProvider>
+					<AgentSidebar
+						activeSessionId={null}
+						onHome={vi.fn()}
+						onSettingsSectionChange={vi.fn()}
+						sessionHistory={makeSessionHistory(threads, vi.fn())}
+						setView={vi.fn()}
+						settingsSection={props.section ?? "General"}
+						view={props.view ?? "chat"}
+					/>
+				</SidebarProvider>,
+			);
+		});
+	};
+	const label = (name: string) =>
+		container.querySelector(`[aria-label="${name}"]`);
+
+	it("leaves Import, Remote and Marketplace out of the settings list", async () => {
+		await renderSidebar("accountant");
+		await vi.waitFor(() => expect(label("General")).not.toBeNull());
+		for (const name of ["Import", "Remote", "Marketplace"]) {
+			expect(label(name)).toBeNull();
+		}
+		expect(label("About")).not.toBeNull();
+	});
+
+	it("keeps Import and Remote in developer mode", async () => {
+		await renderSidebar("developer");
+		await vi.waitFor(() => expect(label("Import")).not.toBeNull());
+		expect(label("Remote")).not.toBeNull();
+	});
+
+	it("drops Marketplace and the lone Installed sub-row under Customize", async () => {
+		await renderSidebar("accountant", [], {
+			view: "settings",
+			section: "Customize",
+		});
+		const actions = container.querySelector(
+			'[aria-label="Sidebar actions"]',
+		) as Element;
+		expect(actions.querySelector('[aria-label="Marketplace"]')).toBeNull();
+		expect(actions.querySelector('[aria-label="Installed"]')).toBeNull();
+		await renderSidebar("developer", [], {
+			view: "settings",
+			section: "Customize",
+		});
+		expect(actions.querySelector('[aria-label="Marketplace"]')).not.toBeNull();
+		expect(actions.querySelector('[aria-label="Installed"]')).not.toBeNull();
+	});
+
+	it("groups by folder by default and says Folder in the sort toggle", async () => {
+		await renderSidebar("accountant", [makeThread("acme", 1)]);
+		expect(label("Sort sessions: Folder")).not.toBeNull();
+		expect(label("Sort sessions: Time")).toBeNull();
+		expect(
+			container.querySelector('button[aria-expanded][title="acme"]'),
+		).not.toBeNull();
+		expect(container.textContent).toContain("Folders");
+		expect(label("Sort sessions: Folder")?.getAttribute("title")).toContain(
+			"Grouped by folder",
+		);
+		await click(label("Sort sessions: Folder") as Element);
+		await vi.waitFor(() => expect(label("Sort sessions: Time")).not.toBeNull());
+		expect(label("Sort sessions: Time")?.getAttribute("title")).toContain(
+			"group by folder",
+		);
+	});
+
+	it("keeps time as the default and says Project in developer mode", async () => {
+		await renderSidebar("developer", [makeThread("acme", 1)]);
+		expect(label("Sort sessions: Time")).not.toBeNull();
+		await click(label("Sort sessions: Time") as Element);
+		await vi.waitFor(() =>
+			expect(label("Sort sessions: Project")).not.toBeNull(),
+		);
+	});
+
+	it("uses folder wording and no git branch in session details", () => {
+		const thread = { ...makeThread("acme", 1), gitBranch: "main" };
+		const items = getSessionOverviewItems(thread, {
+			workspaceLabel: "Folder",
+			showGit: false,
+		});
+		expect(items[0]).toEqual(["Folder", "acme", "/projects/acme"]);
+		expect(items.some(([name]) => name === "Branch")).toBe(false);
 	});
 });

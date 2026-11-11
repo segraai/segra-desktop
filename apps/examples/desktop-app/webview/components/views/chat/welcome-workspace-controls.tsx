@@ -31,6 +31,8 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useIsAccountantMode } from "@/lib/app-mode";
+import { useTerms } from "@/lib/app-terms";
 import {
 	type CloudBranchListOptions,
 	type CloudBranchListResult,
@@ -583,6 +585,8 @@ function WorkspacePicker({
 	const workspaceListRef = useRef<HTMLDivElement>(null);
 	const [selectingChat, setSelectingChat] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const terms = useTerms();
+	const accountantMode = useIsAccountantMode();
 	const isChatWorkspace =
 		!workspaceRoot.trim() || isChatWorkspacePath(workspaceRoot);
 
@@ -681,7 +685,9 @@ function WorkspacePicker({
 	};
 
 	const workspaceLabel = isChatWorkspace
-		? "Chat"
+		? accountantMode
+			? "Choose folder"
+			: "Chat"
 		: workspaceName(workspaceRoot);
 
 	return (
@@ -705,7 +711,7 @@ function WorkspacePicker({
 							setSearch(value);
 							setError(null);
 						}}
-						placeholder="Search workspaces, or type a folder path"
+						placeholder={terms.searchWorkspacesPlaceholder}
 						value={search}
 					/>
 					<div className="p-1.5">
@@ -730,7 +736,7 @@ function WorkspacePicker({
 								<div className="px-2 py-2 text-xs text-muted-foreground">
 									{looksLikeFolderPath(search)
 										? "Press the option above to open this folder"
-										: "No workspaces found — type a full folder path to add one"}
+										: `No ${terms.workspaces} found — type a full folder path to add one`}
 								</div>
 							) : (
 								filteredWorkspaces.map((path) => {
@@ -1031,6 +1037,10 @@ export function WelcomeWorkspaceControls({
 	>(null);
 	const [cloudRepositoryId, setCloudRepositoryId] = useState<number>();
 	const [cloudDefaultBranch, setCloudDefaultBranch] = useState("");
+	// Accountant mode is local-only: no cloud, branch or worktree controls.
+	const accountantMode = useIsAccountantMode();
+	const showCloud =
+		!accountantMode && cloudEnabled && executionTarget === "cloud";
 	const isChatWorkspace =
 		!workspaceRoot.trim() || isChatWorkspacePath(workspaceRoot);
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -1053,6 +1063,7 @@ export function WelcomeWorkspaceControls({
 	}, [repoUrl]);
 	useEffect(() => {
 		if (
+			accountantMode ||
 			executionTarget !== "cloud" ||
 			!signedIn ||
 			!repoUrl.trim() ||
@@ -1070,6 +1081,7 @@ export function WelcomeWorkspaceControls({
 			cancelled = true;
 		};
 	}, [
+		accountantMode,
 		cloudRepositoryId,
 		executionTarget,
 		handleCloudRepositoriesLoaded,
@@ -1098,7 +1110,7 @@ export function WelcomeWorkspaceControls({
 			className="flex min-w-0 flex-wrap items-center gap-2"
 			ref={containerRef}
 		>
-			{cloudEnabled && executionTarget === "cloud" ? (
+			{showCloud ? (
 				cloudControlsHidden ? null : signedIn ? (
 					<>
 						<CloudRepositoryPicker
@@ -1164,7 +1176,8 @@ export function WelcomeWorkspaceControls({
 						workspaceRoot={workspaceRoot}
 						workspaces={workspaces}
 					/>
-					{!isChatWorkspace &&
+					{!accountantMode &&
+					!isChatWorkspace &&
 					currentBranch !== null &&
 					currentBranch !== "no-git" ? (
 						<>

@@ -50,6 +50,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useWorkspace } from "@/contexts/workspace-context";
 import type { PromptInQueue } from "@/hooks/chat-session/types";
 import { toast } from "@/hooks/use-toast";
+import { useIsAccountantMode } from "@/lib/app-mode";
 import type { ChatSessionConfig, ChatSessionStatus } from "@/lib/chat-schema";
 import { imageFilesFromClipboard } from "@/lib/clipboard-images";
 import { cloudRepositoryLabel } from "@/lib/cloud-repositories";
@@ -423,6 +424,8 @@ function ChatInputBarImpl({
 		switchWorkspace: onSwitchWorkspace,
 		pickWorkspaceDirectory: onPickWorkspaceDirectory,
 	} = useWorkspace();
+	// Accountants have no use for git or pull requests: those parts stay hidden.
+	const accountant = useIsAccountantMode();
 	// Keystrokes only update this local state; the parent page tree is not
 	// re-rendered per keypress. External writers push text in via promptDraft.
 	const [promptInput, setPromptInputState] = useState(promptDraft.value);
@@ -1193,7 +1196,9 @@ function ChatInputBarImpl({
 			variant={variant}
 		>
 			{/* Input area */}
-			<PullRequestBar cwd={workspaceRoot} branch={gitBranch} />
+			{accountant ? null : (
+				<PullRequestBar cwd={workspaceRoot} branch={gitBranch} />
+			)}
 			<AgentComposerBody variant={variant} hasQueue={promptsInQueue.length > 0}>
 				<AgentPromptQueue
 					items={displayPromptsInQueue}
@@ -1459,7 +1464,9 @@ function ChatInputBarImpl({
 												: !workspaceRoot || isChatWorkspacePath(workspaceRoot)
 													? "Ask anything. Type / for commands."
 													: variant === "welcome"
-														? "Ask to make changes, @mention files, reference #PRs, or run /commands."
+														? accountant
+															? "Ask a question, @mention files, or run /commands."
+															: "Ask to make changes, @mention files, reference #PRs, or run /commands."
 														: "Enter your question or type / for commands or @ for context"
 							}
 							readOnly={speechInputActive || readOnly}
@@ -1700,7 +1707,8 @@ function ChatInputBarImpl({
 									</span>
 								) : (
 									<WorkspaceSelector
-										currentBranch={gitBranch}
+										// "no-git" keeps the selector on plain folder language.
+										currentBranch={accountant ? "no-git" : gitBranch}
 										disabled
 										onListGitBranches={onListGitBranches}
 										onRefreshWorkspaces={onRefreshWorkspaces}

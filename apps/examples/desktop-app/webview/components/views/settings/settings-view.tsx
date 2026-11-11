@@ -28,6 +28,7 @@ import {
 	readStoredAppIcon,
 	setStoredAppIcon,
 } from "@/lib/app-icon";
+import { type AppMode, setStoredAppMode, useAppMode } from "@/lib/app-mode";
 import { desktopClient } from "@/lib/desktop-client";
 import { resetOnboarding } from "@/lib/onboarding";
 import {
@@ -76,7 +77,7 @@ import {
 } from "./provider-list-view";
 import { RemoteEnvironmentsContent } from "./remote-environments-view";
 import { RoutineSchedulesContent } from "./routine-view";
-import type { SettingsSection } from "./sections";
+import { isSectionAvailableInMode, type SettingsSection } from "./sections";
 import { toSettingsPatch } from "./settings-patch";
 import { VoiceInputContent } from "./voice-input-view";
 
@@ -105,7 +106,7 @@ let providerCatalogCache: {
 // -----------------------------------------------------------
 
 export function SettingsView({
-	section,
+	section: requestedSection,
 	onNavigateSection,
 	onOpenSession,
 	onExportDiagnostics,
@@ -115,6 +116,14 @@ export function SettingsView({
 	onNavigateSection: (section: SettingsSection) => void;
 	onOpenSession?: (sessionId: string) => void | Promise<void>;
 }) {
+	const appMode = useAppMode();
+	// A section hidden in the current mode falls back to General.
+	const section: SettingsSection = isSectionAvailableInMode(
+		requestedSection,
+		appMode,
+	)
+		? requestedSection
+		: "General";
 	const activeNav = section;
 	const [marketplaceInitialFilter, setMarketplaceInitialFilter] =
 		useState<MarketplaceTypeFilter | null>(null);
@@ -673,11 +682,17 @@ const ACCENT_OPTIONS: { id: HubAccent; label: string; swatch: string }[] = [
 	{ id: "ember", label: "Ember", swatch: "oklch(0.6 0.19 33)" },
 ];
 
+const APP_MODE_OPTIONS: { id: AppMode; label: string }[] = [
+	{ id: "accountant", label: "Accountant" },
+	{ id: "developer", label: "Developer" },
+];
+
 function GeneralSettingsContent({
 	onExportDiagnostics,
 }: {
 	onExportDiagnostics: () => void;
 }) {
+	const appMode = useAppMode();
 	const [theme, setTheme] = useState<HubTheme>(() => {
 		if (typeof window === "undefined") return "light";
 		return readStoredHubTheme() ?? readSystemHubTheme();
@@ -800,6 +815,29 @@ function GeneralSettingsContent({
 				title="Settings"
 			/>
 			<section className="max-w-344">
+				<div className="flex items-center justify-between gap-5 border-b py-4 max-[720px]:flex-col max-[720px]:items-stretch">
+					<div className="flex flex-col gap-1">
+						<p className="text-base font-semibold text-foreground">Mode</p>
+						<p className="text-sm text-muted-foreground">
+							Accountant mode hides the coding tools: git branches, pull
+							requests and code diffs.
+						</p>
+					</div>
+					<div className="flex shrink-0 items-center gap-2">
+						{APP_MODE_OPTIONS.map((option) => (
+							<Button
+								aria-pressed={appMode === option.id}
+								key={option.id}
+								onClick={() => setStoredAppMode(option.id)}
+								size="sm"
+								type="button"
+								variant={appMode === option.id ? "default" : "outline"}
+							>
+								{option.label}
+							</Button>
+						))}
+					</div>
+				</div>
 				<NotificationSettings />
 				<div className="flex py-4 items-center justify-between gap-5 border-b max-[720px]:flex-col max-[720px]:items-stretch max-[720px]:py-4">
 					<div className="flex flex-col gap-1">

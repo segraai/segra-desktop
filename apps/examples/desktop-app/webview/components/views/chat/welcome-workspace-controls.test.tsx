@@ -22,6 +22,7 @@ beforeEach(() => {
 			clear: () => values.clear(),
 		},
 	});
+	window.localStorage.setItem("segra.app-mode.v1", "developer");
 	container = document.createElement("div");
 	document.body.appendChild(container);
 	root = createRoot(container);
@@ -853,5 +854,32 @@ describe("WelcomeWorkspaceControls worktree toggle", () => {
 		});
 		expect(worktreeSwitch()).toBeNull();
 		expect(container.textContent).not.toContain("Worktree");
+	});
+});
+
+describe("WelcomeWorkspaceControls accountant mode", () => {
+	beforeEach(() => {
+		window.localStorage.setItem("segra.app-mode.v1", "accountant");
+	});
+
+	it("stays local-only even when cloud, git and worktree props are set", () => {
+		const props = renderControls({
+			cloudEnabled: true,
+			executionTarget: "cloud",
+			repoUrl: "https://github.com/cline/cline",
+			onWorkInChange: vi.fn(),
+		});
+		const text = container.textContent ?? "";
+		expect(text).toContain("cline");
+		expect(text).not.toMatch(/main|Cloud|Sign in/i);
+		expect(
+			container.querySelector('[aria-label="About worktrees"]'),
+		).toBeNull();
+		expect(props.onListCloudRepositories).not.toHaveBeenCalled();
+	});
+
+	it("uses folder wording", () => {
+		renderControls({ workspaceRoot: "" });
+		expect(button("Choose folder")).toBeDefined();
 	});
 });

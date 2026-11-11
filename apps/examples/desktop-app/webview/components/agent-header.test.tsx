@@ -10,6 +10,8 @@ let root: Root;
 
 beforeEach(() => {
 	Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+	// Developer behaviour by default; accountant mode is tested separately.
+	window.localStorage.setItem("segra.app-mode.v1", "developer");
 	container = document.createElement("div");
 	document.body.appendChild(container);
 	root = createRoot(container);
@@ -511,5 +513,35 @@ describe("AgentHeader subagent session badge", () => {
 		expect(badge).not.toBeNull();
 		expect(container.querySelector("#agent-activity")).not.toBeNull();
 		expect(container.querySelector("#diff-stats")).not.toBeNull();
+	});
+});
+
+describe("AgentHeader accountant mode", () => {
+	it("shows the diff button in developer mode", async () => {
+		await act(async () => {
+			root.render(
+				<AgentHeader
+					diff={{ additions: 3, deletions: 1 }}
+					status="completed"
+					title="S"
+				/>,
+			);
+		});
+		expect(container.querySelector("#diff-stats")).not.toBeNull();
+	});
+
+	it("has no diff entry point in accountant mode", async () => {
+		window.localStorage.setItem("segra.app-mode.v1", "accountant");
+		await act(async () => {
+			root.render(
+				<AgentHeader
+					diff={{ additions: 3, deletions: 1 }}
+					status="completed"
+					title="S"
+				/>,
+			);
+		});
+		expect(container.querySelector("#diff-stats")).toBeNull();
+		expect(container.querySelector('[aria-label^="Open diff"]')).toBeNull();
 	});
 });

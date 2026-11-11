@@ -71,6 +71,8 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
+import { useAppMode } from "@/lib/app-mode";
+import { useTerms } from "@/lib/app-terms";
 import { desktopClient } from "@/lib/desktop-client";
 import { readModelSelectionStorageFromWindow } from "@/lib/model-selection";
 import { normalizeProviderId } from "@/lib/provider-id";
@@ -82,7 +84,11 @@ import { preserveRoutineCron } from "@/lib/routine-schedule-cron";
 import { routineScheduleTimezone } from "@/lib/routine-schedule-timezone";
 import { cn } from "@/lib/utils";
 import { PageEmptyState, PageFrame, PageHeader } from "../page-layout";
-import { ROUTINE_TEMPLATES, type RoutineTemplate } from "./routine-templates";
+import {
+	defaultRoutinePromptForMode,
+	type RoutineTemplate,
+	routineTemplatesForMode,
+} from "./routine-templates";
 
 type DateTimeValue = number | string;
 
@@ -498,6 +504,9 @@ export function RoutineSchedulesContent({
 }: {
 	onOpenSession?: (sessionId: string) => void | Promise<void>;
 }) {
+	const appMode = useAppMode();
+	const terms = useTerms();
+	const isAccountant = appMode === "accountant";
 	const [schedules, setSchedules] = useState<RoutineSchedule[]>(
 		() => routineOverviewCache?.schedules ?? [],
 	);
@@ -585,7 +594,7 @@ export function RoutineSchedulesContent({
 		scheduleHour: "9",
 		scheduleMinute: "0",
 		scheduleDays: ["MON", "TUE", "WED", "THU", "FRI"],
-		prompt: "Review PRs opened yesterday and summarize issues.",
+		prompt: defaultRoutinePromptForMode(appMode),
 		provider: "cline",
 		model: CLINE_DEFAULT_MODEL_ID,
 		workspaceRoot: "",
@@ -942,8 +951,7 @@ export function RoutineSchedulesContent({
 				"THU",
 				"FRI",
 			],
-			prompt:
-				template?.prompt ?? "Review PRs opened yesterday and summarize issues.",
+			prompt: template?.prompt ?? defaultRoutinePromptForMode(appMode),
 			provider: preferredProvider,
 			model: preferredModel,
 			workspaceRoot: context.workspaceRoot || context.cwd,
@@ -1037,7 +1045,7 @@ export function RoutineSchedulesContent({
 		}
 		const workspaceRoot = asTrimmedFormString(createForm.workspaceRoot);
 		if (!workspaceRoot) {
-			setCreateFormError("Workspace is required.");
+			setCreateFormError(`${terms.Workspace} is required.`);
 			return;
 		}
 		setCreateFormError(null);
@@ -1138,10 +1146,10 @@ export function RoutineSchedulesContent({
 		const existingNames = new Set(
 			schedules.map((schedule) => schedule.name.trim().toLowerCase()),
 		);
-		return ROUTINE_TEMPLATES.filter(
+		return routineTemplatesForMode(appMode).filter(
 			(template) => !existingNames.has(template.name.trim().toLowerCase()),
 		);
-	}, [schedules]);
+	}, [schedules, appMode]);
 
 	// Collapse the runs list back to the recent-three preview whenever a
 	// different schedule's details are opened.
@@ -1172,7 +1180,11 @@ export function RoutineSchedulesContent({
 	return (
 		<PageFrame>
 			<PageHeader
-				description="Run agents on cron schedules for recurring automations like daily summaries and code reviews."
+				description={
+					isAccountant
+						? "Run the assistant on a schedule for recurring checks like new documents and weekly summaries."
+						: "Run agents on cron schedules for recurring automations like daily summaries and code reviews."
+				}
 				title="Schedule"
 				actions={
 					<>
@@ -1673,7 +1685,9 @@ export function RoutineSchedulesContent({
 										name: event.target.value,
 									}))
 								}
-								placeholder="Daily code review"
+								placeholder={
+									isAccountant ? "Daily document check" : "Daily code review"
+								}
 							/>
 						</div>
 
@@ -1920,7 +1934,7 @@ export function RoutineSchedulesContent({
 						</div>
 
 						<div className="sm:col-span-2 space-y-2">
-							<Label htmlFor="routine-workspace">Workspace</Label>
+							<Label htmlFor="routine-workspace">{terms.Workspace}</Label>
 							<Input
 								id="routine-workspace"
 								value={createForm.workspaceRoot}

@@ -62,6 +62,7 @@ let root: Root;
 
 beforeEach(() => {
 	window.localStorage.clear();
+	window.localStorage.setItem("segra.app-mode.v1", "developer");
 	accountRef.user = null;
 	accountRef.activeOrganization = null;
 	Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -722,6 +723,98 @@ describe("WelcomeScreen", () => {
 		await clickButton("Just chat", true);
 
 		expect(selectChat).toHaveBeenCalledOnce();
+	});
+});
+
+describe("WelcomeScreen accountant mode", () => {
+	beforeEach(() => {
+		window.localStorage.setItem("segra.app-mode.v1", "accountant");
+	});
+
+	function cardButtons() {
+		return [
+			...container.querySelectorAll<HTMLButtonElement>("[data-starter-id]"),
+		];
+	}
+
+	it("uses the accountant heading and shows four starting points", async () => {
+		await renderWelcomeScreen({
+			workspaceRoot: "/clients/acme",
+			workspaces: [],
+		});
+		expect(container.querySelector("h1")?.textContent).toBe(
+			"What would you like to work on?",
+		);
+		expect(cardButtons()).toHaveLength(4);
+		expect(container.textContent).toContain("Extract client documents");
+	});
+
+	it("keeps the developer heading and no cards in developer mode", async () => {
+		window.localStorage.setItem("segra.app-mode.v1", "developer");
+		await renderWelcomeScreen({ workspaceRoot: "/projects/p", workspaces: [] });
+		expect(container.querySelector("h1")?.textContent).toBe(
+			"What would you like to build?",
+		);
+		expect(cardButtons()).toHaveLength(0);
+	});
+
+	it("hands the prompt to the callback when a card is clicked, without sending", async () => {
+		const onSelectAccountantStarter = vi.fn();
+		invokeMock.mockClear();
+		await renderWelcomeScreen({
+			workspaceRoot: "/clients/acme",
+			workspaces: [],
+			onSelectAccountantStarter,
+		});
+		await clickButton("Read a CRA notice");
+		expect(onSelectAccountantStarter).toHaveBeenCalledOnce();
+		expect(onSelectAccountantStarter.mock.calls[0]?.[0]).toContain(
+			"read_document",
+		);
+		expect(
+			invokeMock.mock.calls.filter(([command]) => /send|start/i.test(command)),
+		).toHaveLength(0);
+	});
+
+	it("shows no branch, repository, cloud or worktree controls even when props enable them", async () => {
+		invokeMock.mockClear();
+		const onListGitBranches = vi.fn(async () => ({
+			current: "main",
+			branches: ["main"],
+		}));
+		accountRef.user = { id: "user-1" };
+		await renderWelcomeScreen({
+			workspaceRoot: "/clients/acme",
+			workspaces: ["/clients/acme"],
+			gitBranch: "main",
+			onListGitBranches,
+			executionTarget: "cloud",
+			cloudAgentsEnabled: true,
+			repoUrl: "https://github.com/org/repo",
+			cloudBranch: "main",
+			workIn: "local",
+			onWorkInChange: vi.fn(),
+		});
+		const text = container.textContent ?? "";
+		expect(text).toContain("acme");
+		expect(text).not.toMatch(/main|Cloud|GitHub|Sign in|worktree/i);
+		expect(
+			container.querySelector('[aria-label="About worktrees"]'),
+		).toBeNull();
+		expect(onListGitBranches).not.toHaveBeenCalled();
+		const commands = invokeMock.mock.calls.map(([command]) => command);
+		expect(commands).not.toContain("list_cloud_repositories");
+		expect(commands).not.toContain("list_cloud_branches");
+	});
+
+	it("uses folder wording in the folder picker", async () => {
+		await renderWelcomeScreen({ workspaceRoot: "", workspaces: [] });
+		expect(container.textContent).toContain("Choose folder");
+		await clickButton("Choose folder");
+		expect(
+			container.querySelector<HTMLInputElement>("input")?.placeholder,
+		).toBe("Search folders, or type a folder path");
+		expect(container.textContent).toContain("No folders found");
 	});
 });
 

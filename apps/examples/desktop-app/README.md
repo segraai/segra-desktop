@@ -343,6 +343,23 @@ Desktop transport envelope:
 - `<sessionId>.hooks.jsonl` is observability/debug telemetry and should not be required for normal history replay/export flows.
 - Full v1 schema for the persisted messages file, including failure/retry semantics and golden fixtures, is documented in [`packages/core/docs/messages-contract-v1.md`](../../../sdk/packages/core/docs/messages-contract-v1.md).
 
+## Cline cloud sessions stay off in Segra Desktop
+
+Cline's "cloud sessions" (agents that run on Cline's servers against a GitHub repository) are inherited code and are
+switched off in Segra Desktop. Keep them off: Segra Desktop stores chats on the user's computer only, and Segra's web
+app stores no chats.
+
+Three things keep the feature off:
+
+- The sidecar sets `SEGRA_DISABLE_CLINE_CLOUD=1` at startup (`sidecar/index.ts`), so nothing calls Cline's servers in
+  the background.
+- Feature flags are never fetched from Cline (`sidecar/feature-flags.ts` uses `NoOpFeatureFlagsProvider`), so the
+  cloud-sessions flag keeps its local default, which is off.
+- In accountant mode the webview also ignores the flag: `cloudAgentsEnabled` in `webview/app/page.tsx` is false, and the
+  welcome screen hides the repository, branch and cloud sign-in controls.
+
+Don't add a remote flag provider or remove that environment variable without replacing these guards.
+
 ## Sidecar observability
 
 The desktop sidecar sends SDK telemetry through the same configured OpenTelemetry

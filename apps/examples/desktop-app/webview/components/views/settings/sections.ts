@@ -5,6 +5,8 @@
  * initial chat bundle. The heavy views load on demand via next/dynamic.
  */
 
+import type { AppMode } from "@/lib/app-mode";
+
 const ALL_SETTINGS_SECTIONS = [
 	"Account",
 	"General",
@@ -49,3 +51,32 @@ export const SETTINGS_SECTIONS = ALL_SETTINGS_SECTIONS.filter(
 export const CUSTOMIZATION_SECTIONS = ALL_CUSTOMIZATION_SECTIONS.filter(
 	(section) => !HIDDEN_SECTIONS.has(section),
 );
+
+const ACCOUNTANT_HIDDEN_SECTIONS: ReadonlySet<SettingsSection> = new Set([
+	"Import",
+	"Remote",
+	"Marketplace",
+]);
+
+export function isSectionAvailableInMode(
+	section: SettingsSection,
+	mode: AppMode,
+): boolean {
+	return mode !== "accountant" || !ACCOUNTANT_HIDDEN_SECTIONS.has(section);
+}
+
+export function settingsSectionsForMode(
+	mode: AppMode,
+): readonly SettingsSection[] {
+	return SETTINGS_SECTIONS.filter((section) =>
+		isSectionAvailableInMode(section, mode),
+	);
+}
+
+export function customizationSectionsForMode(
+	mode: AppMode,
+): readonly SettingsSection[] {
+	return CUSTOMIZATION_SECTIONS.filter((section) =>
+		isSectionAvailableInMode(section, mode),
+	);
+}

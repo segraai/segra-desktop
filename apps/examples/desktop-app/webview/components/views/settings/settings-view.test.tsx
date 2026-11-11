@@ -7,6 +7,7 @@ import {
 	APP_FONT_SIZE_STORAGE_KEY,
 	applyAppZoomAction,
 } from "@/lib/app-font-size";
+import { APP_MODE_STORAGE_KEY, readStoredAppMode } from "@/lib/app-mode";
 import { SettingsView } from "./settings-view";
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
@@ -110,5 +111,50 @@ describe("SettingsView font size", () => {
 		expect(container.textContent).toContain("20px");
 		expect(updatedSlider?.getAttribute("aria-valuenow")).toBe("20");
 		expect(increaseButton?.disabled).toBe(true);
+	});
+});
+
+describe("SettingsView mode", () => {
+	const renderGeneral = async (section: "General" | "Import" = "General") => {
+		await act(async () => {
+			root.render(
+				<SettingsView
+					onExportDiagnostics={vi.fn()}
+					onNavigateSection={vi.fn()}
+					section={section}
+				/>,
+			);
+		});
+	};
+	const modeButton = (label: string) =>
+		Array.from(container.querySelectorAll("button")).find(
+			(b) => b.textContent === label,
+		);
+
+	it("renders the Mode control with accountant selected by default", async () => {
+		await renderGeneral();
+		expect(container.textContent).toContain(
+			"Accountant mode hides the coding tools: git branches, pull requests and code diffs.",
+		);
+		expect(modeButton("Accountant")?.getAttribute("aria-pressed")).toBe("true");
+		expect(modeButton("Developer")?.getAttribute("aria-pressed")).toBe("false");
+	});
+
+	it("switches mode, persists it and updates the control", async () => {
+		await renderGeneral();
+		await act(async () => {
+			modeButton("Developer")?.click();
+		});
+		expect(window.localStorage.getItem(APP_MODE_STORAGE_KEY)).toBe("developer");
+		expect(readStoredAppMode()).toBe("developer");
+		expect(modeButton("Developer")?.getAttribute("aria-pressed")).toBe("true");
+		expect(modeButton("Accountant")?.getAttribute("aria-pressed")).toBe(
+			"false",
+		);
+	});
+
+	it("shows General when asked for a section hidden in accountant mode", async () => {
+		await renderGeneral("Import");
+		expect(container.textContent).toContain("Font size");
 	});
 });

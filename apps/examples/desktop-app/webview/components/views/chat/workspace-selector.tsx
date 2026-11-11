@@ -17,6 +17,8 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useIsAccountantMode } from "@/lib/app-mode";
+import { useTerms } from "@/lib/app-terms";
 import { scrollCurrentOptionIntoView } from "@/lib/scroll-current-option";
 import { cn } from "@/lib/utils";
 import {
@@ -61,6 +63,8 @@ export function WorkspaceSelector({
 	onCreateGitBranch?: (branchName: string) => Promise<boolean>;
 	disabled?: boolean;
 }) {
+	const terms = useTerms();
+	const accountantMode = useIsAccountantMode();
 	const [open, setOpen] = useState(false);
 	const [search, setSearch] = useState("");
 	const [branches, setBranches] = useState<string[]>([]);
@@ -101,7 +105,8 @@ export function WorkspaceSelector({
 	// Git chrome (branch label, branch list, create-branch) is a developer
 	// affordance; a plain folder shows only folder language. Pending branch
 	// discovery (null) is presented like a plain folder until it resolves.
-	const hasGit = currentBranch !== null && currentBranch !== "no-git";
+	const hasGit =
+		!accountantMode && currentBranch !== null && currentBranch !== "no-git";
 
 	const openMenu = async () => {
 		if (disabled) {
@@ -117,10 +122,10 @@ export function WorkspaceSelector({
 		setLoadingBranches(true);
 		try {
 			const [branchPayload] = await Promise.all([
-				onListGitBranches(),
+				accountantMode ? null : onListGitBranches(),
 				onRefreshWorkspaces(),
 			]);
-			setBranches(branchPayload.branches);
+			if (branchPayload) setBranches(branchPayload.branches);
 		} finally {
 			setLoadingBranches(false);
 		}
@@ -257,7 +262,7 @@ export function WorkspaceSelector({
 							variant="ghost"
 							aria-label={
 								hasGit
-									? `Workspace ${workspaceName}, branch ${currentBranch}`
+									? `${terms.Workspace} ${workspaceName}, branch ${currentBranch}`
 									: `Folder ${workspaceName}`
 							}
 							className="flex max-w-full min-w-0 items-center gap-1 h-auto px-1 py-0.5 hover:text-foreground transition-colors max-[560px]:size-7 max-[560px]:justify-center max-[560px]:p-0 text-sm"
@@ -326,7 +331,9 @@ export function WorkspaceSelector({
 								value={search}
 								onChange={(e) => setSearch(e.target.value)}
 								placeholder={
-									hasGit ? "Search workspaces & branches" : "Search workspaces"
+									hasGit
+										? "Search workspaces & branches"
+										: `Search ${terms.workspaces}`
 								}
 								className="h-8 flex-1 border-0 bg-transparent px-0 py-0 text-xs shadow-none focus-visible:ring-0 dark:bg-transparent"
 							/>
@@ -341,7 +348,7 @@ export function WorkspaceSelector({
 								{/* Workspaces section */}
 								<div className="p-1.5 border-b border-border">
 									<div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-										Workspaces
+										{terms.Workspaces}
 									</div>
 									{looksLikeFolderPath(search) && (
 										<Button
@@ -366,7 +373,7 @@ export function WorkspaceSelector({
 											<div className="px-2 py-2 text-xs text-muted-foreground">
 												{looksLikeFolderPath(search)
 													? "Press the option above to open this folder"
-													: "No workspaces found — type a full folder path to add one"}
+													: `No ${terms.workspaces} found — type a full folder path to add one`}
 											</div>
 										) : (
 											filteredWorkspaces.map((wp) => {
@@ -435,7 +442,7 @@ export function WorkspaceSelector({
 														setWorkspacePathInput("");
 													}
 												}}
-												placeholder="/path/to/workspace"
+												placeholder={`/path/to/${terms.workspace.replace(" ", "-")}`}
 												className="h-7 text-xs"
 											/>
 											<Button

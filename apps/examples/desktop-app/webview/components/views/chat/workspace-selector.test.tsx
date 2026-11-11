@@ -10,6 +10,7 @@ let root: Root;
 
 beforeEach(() => {
 	Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+	window.localStorage.setItem("segra.app-mode.v1", "developer");
 	container = document.createElement("div");
 	document.body.appendChild(container);
 	root = createRoot(container);

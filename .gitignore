@@ -97,3 +97,6 @@ apps/examples/desktop-app/.cursor/settings.json
 
 # Website copy drafts (kept local)
 apps/examples/desktop-app/website-copy.md
+
+# graphify knowledge-graph output (regenerate with /graphify)
+graphify-out/

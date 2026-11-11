@@ -88,8 +88,9 @@ import { normalizeTitle } from "@/components/utils";
 import {
 	CUSTOMIZATION_SECTION_LABELS,
 	CUSTOMIZATION_SECTIONS,
-	SETTINGS_SECTIONS,
+	customizationSectionsForMode,
 	type SettingsSection,
+	settingsSectionsForMode,
 } from "@/components/views/settings/sections";
 import { useHasConnectedProvider } from "@/hooks/use-has-connected-provider";
 import type {
@@ -102,6 +103,8 @@ import {
 	isBetaVersion,
 	productNameForVersion,
 } from "@/lib/app-channel";
+import { useAppMode } from "@/lib/app-mode";
+import { useTerms } from "@/lib/app-terms";
 import { desktopClient } from "@/lib/desktop-client";
 import {
 	ALL_SESSION_SOURCES,
@@ -200,6 +203,9 @@ function SettingsSectionNavigation({
 	// Voice input only works with a connected model provider, so its section
 	// stays disabled until one is set up (null = catalog still loading).
 	const hasConnectedProvider = useHasConnectedProvider();
+	const mode = useAppMode();
+	const settingsSections = settingsSectionsForMode(mode);
+	const customizationSections = customizationSectionsForMode(mode);
 	const renderSectionButton = (section: SettingsSection) => {
 		const Icon = SETTINGS_SECTION_ICONS[section];
 		const label = settingsSectionLabel(section);
@@ -273,14 +279,14 @@ function SettingsSectionNavigation({
 			    The collapsed sidebar has no action rows and keeps them
 			    reachable. */}
 			{open
-				? SETTINGS_SECTIONS.filter(
-						(section) => collapsed || section !== "Schedules",
-					).map(renderSectionButton)
+				? settingsSections
+						.filter((section) => collapsed || section !== "Schedules")
+						.map(renderSectionButton)
 				: null}
-			{collapsed ? (
+			{collapsed && customizationSections.length > 0 ? (
 				<>
 					<div className="my-2 h-px w-6 shrink-0 bg-sidebar-border" />
-					{CUSTOMIZATION_SECTIONS.map(renderSectionButton)}
+					{customizationSections.map(renderSectionButton)}
 				</>
 			) : null}
 		</nav>
@@ -337,7 +343,13 @@ export function AgentSidebar({
 	const activeThread = activeSessionId ?? "";
 	const [filter, setFilter] = useState<FilterOption>("All");
 	const [sourceFilter, setSourceFilter] = useState(ALL_SESSION_SOURCES);
-	const [sortMode, setSortMode] = useState<SidebarSortMode>("time");
+	const mode = useAppMode();
+	const terms = useTerms();
+	// Not persisted. Until the user picks one, accountants group by folder and
+	// developers sort by time.
+	const [sortChoice, setSortChoice] = useState<SidebarSortMode | null>(null);
+	const sortMode: SidebarSortMode =
+		sortChoice ?? (mode === "accountant" ? "project" : "time");
 	// Segra: the bottom Settings list folds; remembered across launches.
 	// macOS draws its traffic lights over the title bar's left edge; elsewhere
 	// that space is free. Decided after mount so hydration matches.
@@ -691,7 +703,7 @@ export function AgentSidebar({
 						</DropdownMenuRadioItem>
 					))}
 				</DropdownMenuRadioGroup>
-				{sourceOptions.length > 0 ? (
+				{sourceOptions.length > 0 && mode !== "accountant" ? (
 					<>
 						<DropdownMenuSeparator />
 						<DropdownMenuLabel>Source</DropdownMenuLabel>
@@ -723,16 +735,14 @@ export function AgentSidebar({
 	// the click switches to, not the one currently active.
 	const sortToggle = (
 		<Button
-			aria-label={`Sort sessions: ${sortMode === "time" ? "Time" : "Project"}`}
+			aria-label={`Sort sessions: ${sortMode === "time" ? "Time" : terms.Project}`}
 			className="m-0! inline-flex size-8 items-center justify-center rounded-md p-0! text-muted-foreground hover:bg-surface-hover hover:text-sidebar-foreground"
-			onClick={() =>
-				setSortMode((current) => (current === "time" ? "project" : "time"))
-			}
+			onClick={() => setSortChoice(sortMode === "time" ? "project" : "time")}
 			size="icon"
 			title={
 				sortMode === "time"
-					? "Sorted by time — click to group by project"
-					: "Grouped by project — click to sort by time"
+					? `Sorted by time — click to group by ${terms.project}`
+					: `Grouped by ${terms.project} — click to sort by time`
 			}
 			variant="ghost"
 		>
@@ -801,6 +811,7 @@ export function AgentSidebar({
 		(CUSTOMIZATION_SECTIONS as readonly SettingsSection[]).includes(
 			settingsSection,
 		);
+	const customizationSections = customizationSectionsForMode(mode);
 	const timeShowMoreButton = (
 		<Button
 			className="px-2!"
@@ -943,7 +954,11 @@ export function AgentSidebar({
 											)}
 										/>
 										<span className="font-medium">
-											Hub @{hubPort(hubStatus?.url ?? null) ?? "unknown"}
+											{mode === "accountant"
+												? hubStatus?.connected
+													? "Connected"
+													: "Not connected"
+												: `Hub @${hubPort(hubStatus?.url ?? null) ?? "unknown"}`}
 										</span>
 									</div>
 									{hubStatus && !hubStatus.connected && (
@@ -1030,8 +1045,9 @@ export function AgentSidebar({
 							<Blocks className="size-4 shrink-0" />
 							<span className="truncate">Customize</span>
 						</Button>
-						{customizeSectionOpen
-							? CUSTOMIZATION_SECTIONS.map((section) => (
+						{/* A lone "Installed" row under Customize would only repeat it. */}
+						{customizeSectionOpen && customizationSections.length > 1
+							? customizationSections.map((section) => (
 									<Button
 										aria-current={
 											settingsSection === section ? "page" : undefined
@@ -1104,7 +1120,7 @@ export function AgentSidebar({
 									onClick={openSessions}
 									type="button"
 								>
-									{sortMode === "time" ? "Sessions" : "Projects"}
+									{sortMode === "time" ? "Sessions" : `${terms.Project}s`}
 								</button>
 								<div className="flex shrink-0 items-center gap-0.5">
 									{sortToggle}
@@ -1338,7 +1354,8 @@ export function AgentSidebar({
 							{deleteConfirmThread?.origin === "cloud"
 								? `This deletes "${normalizeTitle(deleteConfirmThread?.title ?? "this session")}" and its cloud workspace.`
 								: `This removes "${normalizeTitle(deleteConfirmThread?.title ?? "this session")}" from local history.`}
-							{deleteConfirmThread?.origin !== "cloud" &&
+							{mode !== "accountant" &&
+							deleteConfirmThread?.origin !== "cloud" &&
 							isTaskWorktreePath(deleteConfirmThread?.workspacePath ?? "")
 								? ` ${TASK_WORKTREE_DELETE_WARNING}`
 								: null}
@@ -1563,7 +1580,13 @@ function ThreadItem({
 	const rowText = label ?? title;
 	const overviewTitle = getSessionOverviewTitle(title);
 	const pending = pendingAction !== null;
-	const infoItems = getSessionOverviewItems(thread);
+	const mode = useAppMode();
+	const terms = useTerms();
+	const infoItems = getSessionOverviewItems(thread, {
+		workspaceLabel: terms.Workspace,
+		showGit: mode !== "accountant",
+		showSource: mode !== "accountant",
+	});
 
 	if (editing) {
 		return (
@@ -1684,25 +1707,35 @@ export function getSessionOverviewTitle(title: string): string {
 
 export function getSessionOverviewItems(
 	thread: SessionThread,
+	options: {
+		workspaceLabel?: string;
+		showGit?: boolean;
+		showSource?: boolean;
+	} = {},
 ): Array<[string, string, string?]> {
+	const {
+		workspaceLabel = "Workspace",
+		showGit = true,
+		showSource = true,
+	} = options;
 	// Updated time is already visible in the sidebar item.
 	const workspacePath = thread.workspacePath || thread.codebase;
 	const items: Array<[string, string | null | undefined, string?]> = [
 		["Schedule", thread.scheduleName],
 		["Run", thread.scheduleRunNumber ? String(thread.scheduleRunNumber) : null],
 		[
-			thread.origin === "cloud" ? "Repository" : "Workspace",
+			thread.origin === "cloud" ? "Repository" : workspaceLabel,
 			thread.origin === "cloud"
 				? thread.repoUrl
 				: workspaceDisplayName(workspacePath),
 			workspacePath || undefined,
 		],
-		["Branch", thread.gitBranch],
+		["Branch", showGit ? thread.gitBranch : null],
 		["Provider", thread.provider],
 		["Model", thread.model],
 		["Tokens", formatTokenCount(thread.inputTokens, thread.outputTokens)],
 		["Cost", formatCostUsd(thread.totalCostUsd)],
-		["Source", thread.source],
+		["Source", showSource ? thread.source : null],
 	];
 	return items.filter((item): item is [string, string, string?] =>
 		Boolean(item[1]),

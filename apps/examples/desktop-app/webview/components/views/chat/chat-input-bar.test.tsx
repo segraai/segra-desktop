@@ -115,6 +115,8 @@ beforeEach(() => {
 		});
 	}
 	window.localStorage.removeItem(REASONING_SELECTION_STORAGE_KEY);
+	// These tests describe developer behaviour; accountant mode has its own file.
+	window.localStorage.setItem("segra.app-mode.v1", "developer");
 	loadProviderModelCatalogMock.mockReset().mockResolvedValue({
 		providers: [],
 		enabledProviderIds: ["cline"],
