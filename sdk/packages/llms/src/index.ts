@@ -149,6 +149,7 @@ export {
 } from "./providers/vendors/cline";
 export {
 	checkSegraProvider,
+	createSegraFetch,
 	SEGRA_DEFAULT_BASE_URL,
 	SEGRA_PROVIDER_ID,
 } from "./providers/vendors/segra";

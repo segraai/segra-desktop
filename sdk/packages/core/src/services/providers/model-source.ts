@@ -58,13 +58,86 @@ export interface ModelSourceAuth {
 	headers?: Record<string, string>;
 }
 
-export async function fetchModelIdsFromSource(
+/**
+ * How long a model list may take. Gateways such as OmniRoute build a large
+ * catalog on the first request after a restart, which can take several seconds.
+ */
+export const MODEL_SOURCE_TIMEOUT_MS = 30_000;
+
+/** Drops trailing slashes from the path: `/v1/models/` often redirects. */
+function withoutTrailingSlash(url: string): string {
+	try {
+		const parsed = new URL(url);
+		if (parsed.pathname.length > 1 && parsed.pathname.endsWith("/")) {
+			parsed.pathname = parsed.pathname.replace(/\/+$/, "") || "/";
+			return parsed.toString();
+		}
+	} catch {
+		// Not a parseable URL: fetch reports the problem below.
+	}
+	return url;
+}
+
+async function fetchModelSource(
 	url: string,
+	init: RequestInit,
+): Promise<Response> {
+	try {
+		return await fetch(url, {
+			...init,
+			signal: AbortSignal.timeout(MODEL_SOURCE_TIMEOUT_MS),
+		});
+	} catch (error) {
+		if (error instanceof Error && error.name === "TimeoutError") {
+			throw new Error(
+				`failed to fetch models from ${url}: no response within ${MODEL_SOURCE_TIMEOUT_MS / 1000} s`,
+			);
+		}
+		throw error;
+	}
+}
+
+/** The server's own reason for an error response, if it gives one. */
+async function errorReason(response: Response): Promise<string | undefined> {
+	let text: string;
+	try {
+		text = (await response.text()).trim();
+	} catch {
+		return undefined;
+	}
+	if (!text) return undefined;
+	let reason = text;
+	try {
+		const body = JSON.parse(text) as {
+			error?: unknown;
+			message?: unknown;
+			detail?: unknown;
+		};
+		const nested =
+			body.error && typeof body.error === "object"
+				? (body.error as { message?: unknown }).message
+				: body.error;
+		const candidate = [nested, body.message, body.detail].find(
+			(value) => typeof value === "string" && value.trim(),
+		);
+		if (typeof candidate === "string") reason = candidate.trim();
+	} catch {
+		// Not JSON: use the text as it is.
+	}
+	reason = reason.replace(/\s+/g, " ");
+	return reason.length > 200 ? `${reason.slice(0, 200)}…` : reason;
+}
+
+export async function fetchModelIdsFromSource(
+	sourceUrl: string,
 	providerId: string,
 	auth: ModelSourceAuth = {},
 ): Promise<string[]> {
-	// A model source may be a third-party public catalog. Only send provider
-	// credentials to its own origin, and do not follow authenticated redirects.
+	const url = withoutTrailingSlash(sourceUrl);
+	// A model source may be a third-party public catalog. Up front, only send
+	// provider credentials to its own origin, and do not follow authenticated
+	// redirects. A different origin gets the API key only after it rejects an
+	// anonymous request (see the retry below).
 	const headers = new Headers();
 	let sameOrigin = false;
 	try {
@@ -86,14 +159,32 @@ export async function fetchModelIdsFromSource(
 	headers.forEach(() => {
 		hasHeaders = true;
 	});
-	const response = await fetch(url, {
+	let response = await fetchModelSource(url, {
 		method: "GET",
 		...(hasHeaders ? { headers, redirect: "error" as const } : {}),
-		signal: AbortSignal.timeout(5_000),
 	});
+	// The source refused an anonymous request, so it is not a public catalog.
+	// Retry once with the provider's API key before giving up: the user pointed
+	// this provider at the URL, and many gateways serve their model list from a
+	// different host than their API. Only the key is sent — never the extra
+	// headers — and redirects stay disabled so it cannot be forwarded elsewhere.
+	const apiKey = auth.apiKey?.trim();
+	if (
+		(response.status === 401 || response.status === 403) &&
+		!hasHeaders &&
+		apiKey
+	) {
+		await response.body?.cancel().catch(() => {});
+		response = await fetchModelSource(url, {
+			method: "GET",
+			headers: { Authorization: `Bearer ${apiKey}` },
+			redirect: "error",
+		});
+	}
 	if (!response.ok) {
+		const reason = await errorReason(response);
 		throw new Error(
-			`failed to fetch models from ${url}: HTTP ${response.status}`,
+			`failed to fetch models from ${url}: HTTP ${response.status}${reason ? `: ${reason}` : ""}`,
 		);
 	}
 	return extractModelIdsFromPayload(

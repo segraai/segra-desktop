@@ -2349,6 +2349,37 @@ describe("saveLocalProviderSettings", () => {
 
 	afterEach(() => cleanup());
 
+	it("does not store a built-in provider's default base URL", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => new Response("offline", { status: 503 })),
+		);
+		const defaultBaseUrl =
+			LlmsModels.MODEL_COLLECTIONS_BY_PROVIDER_ID.segra?.provider.baseUrl;
+		expect(defaultBaseUrl).toBeTruthy();
+		manager.saveProviderSettings({
+			provider: "segra",
+			baseUrl: "https://staging.segra.test/api/app/v1",
+		});
+
+		await saveLocalProviderSettings(manager, {
+			providerId: "segra",
+			apiKey: "sk-segra",
+			baseUrl: `${defaultBaseUrl}/`,
+		});
+		const saved = manager.getProviderSettings("segra");
+		expect(saved?.apiKey).toBe("sk-segra");
+		expect(saved?.baseUrl).toBeUndefined();
+
+		await saveLocalProviderSettings(manager, {
+			providerId: "segra",
+			baseUrl: "https://staging.segra.test/api/app/v1",
+		});
+		expect(manager.getProviderSettings("segra")?.baseUrl).toBe(
+			"https://staging.segra.test/api/app/v1",
+		);
+	});
+
 	it("saves and disables the canonical mixed-case built-in provider ID", async () => {
 		const providerId = "nousResearch";
 		expect(await LlmsModels.getProvider(providerId)).toBeDefined();
@@ -3286,6 +3317,31 @@ describe("refreshProviderModelsFromSource", () => {
 		expect(Object.keys(entry.models ?? {})).toEqual(["new-model"]);
 		expect(entry.discoveredModelIds).toEqual(["new-model"]);
 		expect(manager.getProviderSettings("ollama")?.model).toBe("new-model");
+	});
+
+	it("fetches the model list with a browser sign-in token without saving it as an API key", async () => {
+		const fetchMock = vi.fn(async (_url: string, _init: RequestInit) =>
+			Response.json({ data: [{ id: "segra-model" }] }),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		manager.saveProviderSettings({
+			provider: "segra",
+			baseUrl: "https://segra.test/api/app/v1",
+			auth: { accessToken: "sk-segra" },
+		});
+
+		await refreshProviderModelsFromSource(manager, "segra");
+
+		expect(fetchMock.mock.calls[0][0]).toBe(
+			"https://segra.test/api/app/v1/models",
+		);
+		expect(
+			new Headers(fetchMock.mock.calls[0][1].headers).get("authorization"),
+		).toBe("Bearer sk-segra");
+		const entry = (await readModelsFile(resolveModelsRegistryPath(manager)))
+			.providers.segra;
+		expect(Object.keys(entry?.models ?? {})).toEqual(["segra-model"]);
+		expect(manager.getProviderSettings("segra")?.apiKey).toBeUndefined();
 	});
 
 	it("refreshes built-in Ollama models through modelsSourceUrl using the saved base URL", async () => {

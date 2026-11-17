@@ -21,6 +21,7 @@ import {
 import {
 	CLINE_PLUGIN_IDLE_TIMEOUT_MS_ENV,
 	loadSandboxedPlugins,
+	toSandboxHookPayload,
 } from "./plugin-sandbox";
 
 function createApiCapture() {
@@ -1339,4 +1340,29 @@ export default {name:'environment',manifest:{capabilities:['commands']},setup(ap
 		await sandbox?.shutdown();
 		await rm(directory, { recursive: true, force: true });
 	}
+});
+
+describe("toSandboxHookPayload", () => {
+	it("replaces the host tool object in tool hook payloads with its name and description", () => {
+		const payload = {
+			toolCall: { toolCallId: "t1", toolName: "read_files" },
+			tool: {
+				name: "read_files",
+				description: "Read files",
+				execute: async () => "ok",
+			},
+		};
+		expect(toSandboxHookPayload("afterTool", payload)).toEqual({
+			toolCall: { toolCallId: "t1", toolName: "read_files" },
+			tool: { name: "read_files", description: "Read files" },
+		});
+		expect(() =>
+			structuredClone(toSandboxHookPayload("beforeTool", payload)),
+		).not.toThrow();
+	});
+
+	it("leaves other hook payloads unchanged", () => {
+		const payload = { snapshot: { agentId: "a" } };
+		expect(toSandboxHookPayload("beforeRun", payload)).toBe(payload);
+	});
 });

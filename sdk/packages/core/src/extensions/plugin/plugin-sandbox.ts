@@ -1010,6 +1010,33 @@ function isMessageArray(value: unknown): value is Message[] {
 	);
 }
 
+/**
+ * Tool hook contexts carry the host's `AgentTool`, whose `execute` and schema
+ * objects can't cross into the sandbox. Send a plain description instead, so
+ * sandboxed tool hooks don't hit the serialization fallback (and its warning)
+ * on every session.
+ */
+export function toSandboxHookPayload(
+	hookName: string,
+	payload: unknown,
+): unknown {
+	if (hookName !== "beforeTool" && hookName !== "afterTool") return payload;
+	if (!payload || typeof payload !== "object") return payload;
+	const { tool } = payload as { tool?: unknown };
+	if (!tool || typeof tool !== "object") return payload;
+	const { name, description } = tool as {
+		name?: unknown;
+		description?: unknown;
+	};
+	return {
+		...(payload as Record<string, unknown>),
+		tool: {
+			...(typeof name === "string" ? { name } : {}),
+			...(typeof description === "string" ? { description } : {}),
+		},
+	};
+}
+
 function makeHookHandler(
 	sandbox: SandboxChannel,
 	pluginId: string,
@@ -1037,8 +1064,10 @@ function makeHookHandler(
 				);
 			}
 		};
-		return await callWithSerializableFallback(invoke, payload, (error) =>
-			warnNonSerializablePayloadOnce("hook", hookName, error),
+		return await callWithSerializableFallback(
+			invoke,
+			toSandboxHookPayload(hookName, payload),
+			(error) => warnNonSerializablePayloadOnce("hook", hookName, error),
 		);
 	};
 }

@@ -811,7 +811,10 @@ async function prepareProviderUpdate(
 		explicitModels,
 		modelsSourceUrl: nextModelsSourceUrl,
 		baseUrl,
-		apiKey,
+		// Browser sign-in (e.g. Segra) stores its key as the OAuth access token,
+		// not `apiKey`. Use it to fetch the model list, without persisting it.
+		apiKey:
+			apiKey ?? (existingSettings?.auth?.accessToken?.trim() || undefined),
 		headers,
 		fallbackModelIds: existingModelIds,
 		shouldRecompute: shouldRecomputeModels,
@@ -1356,11 +1359,25 @@ async function saveLocalProviderSettingsUnlocked(
 		provider: providerId,
 	};
 
+	// A built-in provider's default base URL is not a user choice: settings
+	// forms echo it back on save. Storing it would pin that URL, including an
+	// environment override such as a dev SEGRA_BASE_URL, for every app that
+	// shares this settings file (the CLI and desktop app both read it).
+	const builtInDefaultBaseUrl = LlmsModels.isBuiltInProviderId(providerId)
+		? LlmsModels.MODEL_COLLECTIONS_BY_PROVIDER_ID[providerId]?.provider.baseUrl
+				?.trim()
+				.replace(/\/+$/, "")
+		: undefined;
+
 	// String fields that should be cleared when empty
 	for (const key of ["apiKey", "baseUrl", "model", "region"] as const) {
 		if (Object.hasOwn(request, key) && typeof request[key] === "string") {
 			const val = (request[key] as string).trim();
-			if (val.length === 0) delete next[key];
+			const isDefaultBaseUrl =
+				key === "baseUrl" &&
+				!!builtInDefaultBaseUrl &&
+				val.replace(/\/+$/, "") === builtInDefaultBaseUrl;
+			if (val.length === 0 || isDefaultBaseUrl) delete next[key];
 			else next[key] = request[key];
 		}
 	}
