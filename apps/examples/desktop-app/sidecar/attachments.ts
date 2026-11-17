@@ -49,10 +49,45 @@ export function materializeUserFiles(
 			requestedName && requestedName !== "." && requestedName !== ".."
 				? requestedName
 				: "attachment.txt";
-		const path = join(attachmentDir, `${randomUUID()}-${safeName}`);
-		writeFileSync(path, file.content, "utf8");
+		const id = randomUUID();
+		let body = file.content;
+		const originalPath = saveOriginal(sessionId, id, safeName, file.data);
+		if (originalPath) {
+			body = `The user attached "${file.name}". The original file is saved at ${originalPath}. To read scanned pages or images, or to re-read it, call read_document with that path.\n\n${file.content}`;
+		}
+		// Always a .txt note so core never sees a fake binary extension.
+		const noteName = safeName.toLowerCase().endsWith(".txt")
+			? safeName
+			: `${safeName}.txt`;
+		const path = join(attachmentDir, `${id}-${noteName}`);
+		writeFileSync(path, body, "utf8");
 		return path;
 	});
+}
+
+/**
+ * Save the original bytes under `<session>/originals/<id>/<name>`. Originals
+ * are outside user-attachments, so per-turn cleanup never touches them; they
+ * go away with the session data folder. Returns undefined if nothing saved.
+ */
+function saveOriginal(
+	sessionId: string,
+	id: string,
+	safeName: string,
+	data: string | undefined,
+): string | undefined {
+	if (!data) return undefined;
+	try {
+		const bytes = Buffer.from(data, "base64");
+		if (bytes.length === 0) return undefined;
+		const dir = join(sharedSessionDataDir(), sessionId, "originals", id);
+		mkdirSync(dir, { recursive: true });
+		const path = join(dir, safeName);
+		writeFileSync(path, bytes);
+		return resolve(path);
+	} catch {
+		return undefined;
+	}
 }
 
 /**

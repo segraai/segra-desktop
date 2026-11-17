@@ -2,7 +2,17 @@
 import { act, createElement, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
-import { serializeAttachments } from "../hooks/chat-session/attachments";
+import {
+	MAX_ATTACHMENT_ORIGINAL_BYTES,
+	serializeAttachments,
+} from "../hooks/chat-session/attachments";
+
+// jsdom's Blob lacks arrayBuffer(); treat files as binary (no file.text()).
+vi.mock("@/lib/document-text", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/document-text")>()),
+	isBinaryFile: async () => true,
+}));
+
 import { usePendingAttachments } from "../hooks/use-pending-attachments";
 import {
 	cloudImageAttachmentError,
@@ -100,4 +110,26 @@ it.each([
 ])("identifies unsupported %s images for the attachment checkpoint", async (extension) => {
 	const file = new File(["image data"], `photo.${extension}`);
 	expect(isUnsupportedImageAttachment(file)).toBe(true);
+});
+
+describe("serializeAttachments original bytes", () => {
+	it("includes base64 of the original for text files", async () => {
+		const file = new File(["hello"], "notes.bin");
+		const result = await serializeAttachments([file]);
+		expect(result.userFiles).toHaveLength(1);
+		expect(result.userFiles[0].data).toBe(btoa("hello"));
+		expect(result.userFiles[0].content).toContain("notes.bin");
+	});
+
+	it("drops data and adds a notice when over budget", async () => {
+		const big = new File(["abc"], "big.bin");
+		Object.defineProperty(big, "size", {
+			value: MAX_ATTACHMENT_ORIGINAL_BYTES + 1,
+		});
+		const result = await serializeAttachments([big]);
+		expect(result.userFiles[0].data).toBeUndefined();
+		expect(result.userFiles[0].content).toMatch(/too large to attach in full/);
+		expect(result.userFiles[0].content).toContain("big.bin");
+		expect(result.userFiles[0].content).toContain("can't read this file type");
+	});
 });

@@ -1,4 +1,4 @@
-import { existsSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -154,5 +154,44 @@ describe("materialized attachment lifecycle", () => {
 		expect(existsSync(queued[0] as string)).toBe(false);
 		expect(existsSync(consumed[0] as string)).toBe(false);
 		expect(existsSync(sessionAttachmentsDir(sessionId))).toBe(true);
+	});
+});
+
+describe("original attachment bytes", () => {
+	const bytes = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x00, 0xff, 0x10]);
+
+	it("saves originals and writes a .txt note pointing at them", () => {
+		const [notePath] = materializeUserFiles(sessionId, [
+			{
+				name: "T4.pdf",
+				content: "[Page 1: no text layer]",
+				data: bytes.toString("base64"),
+			},
+		]) as string[];
+		expect(notePath.endsWith(".txt")).toBe(true);
+		const note = readFileSync(notePath, "utf8");
+		const match = note.match(/saved at (.+?)\. To read/);
+		expect(match).toBeTruthy();
+		const originalPath = match?.[1] as string;
+		expect(originalPath).toContain("originals");
+		expect(originalPath.endsWith("T4.pdf")).toBe(true);
+		expect(note).toContain("read_document");
+		expect(note).toContain("\n\n[Page 1: no text layer]");
+		expect(readFileSync(originalPath).equals(bytes)).toBe(true);
+
+		deleteMaterializedAttachments(sessionId, [notePath]);
+		expect(existsSync(notePath)).toBe(false);
+		expect(existsSync(originalPath)).toBe(true);
+	});
+
+	it("handles files without data and invalid base64", () => {
+		const paths = materializeUserFiles(sessionId, [
+			{ name: "a.md", content: "hello" },
+			{ name: "b.txt", content: "plain", data: "!!!" },
+		]) as string[];
+		expect(paths[0].endsWith("a.md.txt")).toBe(true);
+		expect(readFileSync(paths[0], "utf8")).toBe("hello");
+		expect(paths[1].endsWith("b.txt")).toBe(true);
+		expect(readFileSync(paths[1], "utf8")).toBe("plain");
 	});
 });

@@ -184,6 +184,8 @@ export type ChatSessionHookEvent = SessionHookEvent & {
 export type SerializedAttachmentFile = {
 	name: string;
 	content: string;
+	/** Base64 of the original bytes (no data: prefix). */
+	data?: string;
 };
 
 export type SerializedAttachments = {

@@ -18,7 +18,7 @@ export type JsonRecord = Record<string, unknown>;
 
 export type ChatTurnAttachments = {
 	userImages?: string[];
-	userFiles?: Array<{ name: string; content: string }>;
+	userFiles?: Array<{ name: string; content: string; data?: string }>;
 };
 
 export type ChatSessionCommandRequest = {
