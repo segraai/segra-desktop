@@ -33,7 +33,8 @@ export interface WriteWorkbookResult {
 
 const REF_RE = /^[A-Za-z]{1,3}[1-9][0-9]*$/;
 const BAD_SHEET_CHARS = /[\\/?*[\]:]/;
-const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?Z?)?$/;
+const ISO_DATE_RE =
+	/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?Z?)?$/;
 
 function isRecord(v: unknown): v is Record<string, unknown> {
 	return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -95,7 +96,11 @@ export function validateInput(raw: unknown): Required<WriteWorkbookInput> {
 		if (name.length > 31) {
 			throw new Error(`${where}.name "${name}" is longer than 31 characters.`);
 		}
-		if (BAD_SHEET_CHARS.test(name) || name.startsWith("'") || name.endsWith("'")) {
+		if (
+			BAD_SHEET_CHARS.test(name) ||
+			name.startsWith("'") ||
+			name.endsWith("'")
+		) {
 			throw new Error(
 				`${where}.name "${name}" contains characters Excel does not allow (\\ / ? * [ ] :) or starts/ends with an apostrophe.`,
 			);
@@ -106,11 +111,18 @@ export function validateInput(raw: unknown): Required<WriteWorkbookInput> {
 
 		let outColumns: { width?: number }[] | undefined;
 		if (columns !== undefined) {
-			if (!Array.isArray(columns)) throw new Error(`${where}.columns must be an array.`);
+			if (!Array.isArray(columns))
+				throw new Error(`${where}.columns must be an array.`);
 			outColumns = columns.map((c, ci) => {
-				if (!isRecord(c)) throw new Error(`${where}.columns[${ci}] must be an object.`);
-				if (c.width !== undefined && (typeof c.width !== "number" || !(c.width > 0) || c.width > 255)) {
-					throw new Error(`${where}.columns[${ci}].width must be a number between 0 and 255.`);
+				if (!isRecord(c))
+					throw new Error(`${where}.columns[${ci}] must be an object.`);
+				if (
+					c.width !== undefined &&
+					(typeof c.width !== "number" || !(c.width > 0) || c.width > 255)
+				) {
+					throw new Error(
+						`${where}.columns[${ci}].width must be a number between 0 and 255.`,
+					);
 				}
 				return { width: c.width as number | undefined };
 			});
@@ -119,33 +131,51 @@ export function validateInput(raw: unknown): Required<WriteWorkbookInput> {
 			throw new Error(`${where}.cells must be an array.`);
 		}
 		const refs = new Set<string>();
-		const outCells: WorkbookCell[] = ((cells as unknown[] | undefined) ?? []).map((c, ci) => {
+		const outCells: WorkbookCell[] = (
+			(cells as unknown[] | undefined) ?? []
+		).map((c, ci) => {
 			const cw = `${where}.cells[${ci}]`;
 			if (!isRecord(c)) throw new Error(`${cw} must be an object.`);
 			if (typeof c.ref !== "string" || !REF_RE.test(c.ref)) {
-				throw new Error(`${cw}.ref must be an A1-style cell reference like "B7", got ${JSON.stringify(c.ref)}.`);
+				throw new Error(
+					`${cw}.ref must be an A1-style cell reference like "B7", got ${JSON.stringify(c.ref)}.`,
+				);
 			}
 			const ref = c.ref.toUpperCase();
-			if (refs.has(ref)) throw new Error(`${cw}: cell ${ref} appears more than once in sheet "${name}".`);
+			if (refs.has(ref))
+				throw new Error(
+					`${cw}: cell ${ref} appears more than once in sheet "${name}".`,
+				);
 			refs.add(ref);
 			const hasValue = c.value !== undefined;
 			const hasFormula = c.formula !== undefined;
 			if (hasValue && hasFormula) {
-				throw new Error(`${cw} (${ref}) has both \`value\` and \`formula\`; give exactly one.`);
+				throw new Error(
+					`${cw} (${ref}) has both \`value\` and \`formula\`; give exactly one.`,
+				);
 			}
 			if (hasValue) {
 				const v = c.value;
 				if (
-					!(v === null || typeof v === "string" || typeof v === "boolean" || (typeof v === "number" && Number.isFinite(v)))
+					!(
+						v === null ||
+						typeof v === "string" ||
+						typeof v === "boolean" ||
+						(typeof v === "number" && Number.isFinite(v))
+					)
 				) {
-					throw new Error(`${cw} (${ref}).value must be a string, finite number, boolean or null.`);
+					throw new Error(
+						`${cw} (${ref}).value must be a string, finite number, boolean or null.`,
+					);
 				}
 			}
 			let formula: string | undefined;
 			if (hasFormula) {
-				if (typeof c.formula !== "string") throw new Error(`${cw} (${ref}).formula must be a string.`);
+				if (typeof c.formula !== "string")
+					throw new Error(`${cw} (${ref}).formula must be a string.`);
 				formula = c.formula.trim().replace(/^=/, "").trim();
-				if (formula.length === 0) throw new Error(`${cw} (${ref}).formula is empty.`);
+				if (formula.length === 0)
+					throw new Error(`${cw} (${ref}).formula is empty.`);
 			}
 			if (c.numFmt !== undefined && typeof c.numFmt !== "string") {
 				throw new Error(`${cw} (${ref}).numFmt must be a string.`);
@@ -179,16 +209,21 @@ async function exists(p: string): Promise<boolean> {
 	}
 }
 
-export async function writeWorkbook(raw: unknown): Promise<WriteWorkbookResult> {
+export async function writeWorkbook(
+	raw: unknown,
+): Promise<WriteWorkbookResult> {
 	const input = validateInput(raw);
 	if (!input.overwrite && (await exists(input.path))) {
-		throw new Error(`File already exists: ${input.path}. Set overwrite: true to replace it, or choose another path.`);
+		throw new Error(
+			`File already exists: ${input.path}. Set overwrite: true to replace it, or choose another path.`,
+		);
 	}
 
 	// Heavy import stays lazy so plugin load stays fast.
-	const ExcelJS = (await import("exceljs")).default ?? (await import("exceljs"));
+	const ExcelJS =
+		(await import("exceljs")).default ?? (await import("exceljs"));
 	const wb = new ExcelJS.Workbook();
-	wb.creator = "Segra Accountant";
+	wb.creator = "Segra";
 	wb.created = new Date();
 
 	const summary: WriteWorkbookResult["sheets"] = [];
@@ -201,7 +236,9 @@ export async function writeWorkbook(raw: unknown): Promise<WriteWorkbookResult> 
 		for (const c of sheet.cells ?? []) {
 			const cell = ws.getCell(c.ref);
 			if (c.formula !== undefined) {
-				cell.value = { formula: c.formula } as import("exceljs").CellFormulaValue;
+				cell.value = {
+					formula: c.formula,
+				} as import("exceljs").CellFormulaValue;
 				formulaCount++;
 			} else if (c.value !== undefined) {
 				let v: CellValue | Date = c.value;
@@ -215,7 +252,11 @@ export async function writeWorkbook(raw: unknown): Promise<WriteWorkbookResult> 
 			if (c.bold) cell.font = { ...(cell.font ?? {}), bold: true };
 			if (c.note !== undefined) cell.note = c.note;
 		}
-		summary.push({ name: sheet.name, cellCount: (sheet.cells ?? []).length, formulaCount });
+		summary.push({
+			name: sheet.name,
+			cellCount: (sheet.cells ?? []).length,
+			formulaCount,
+		});
 	}
 
 	await mkdir(dirname(input.path), { recursive: true });
@@ -223,7 +264,9 @@ export async function writeWorkbook(raw: unknown): Promise<WriteWorkbookResult> 
 	try {
 		await wb.xlsx.writeFile(tmp);
 		if (!input.overwrite && (await exists(input.path))) {
-			throw new Error(`File already exists: ${input.path}. Set overwrite: true to replace it.`);
+			throw new Error(
+				`File already exists: ${input.path}. Set overwrite: true to replace it.`,
+			);
 		}
 		await rename(tmp, input.path);
 	} catch (err) {

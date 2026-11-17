@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "segra-accountant",
+      "name": "segra-documents",
       "dependencies": {
         "exceljs": "^4.4.0",
         "pdfjs-dist": "6.4.299",

@@ -1,8 +1,9 @@
 // Core logic for read_document. Must NOT import @cline/core (so Bun can test it
 // directly). Heavy libraries (pdfjs-dist, tesseract.js) are imported lazily.
-import { createRequire } from "node:module";
+
 import { existsSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { basename, dirname, extname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
@@ -18,9 +19,68 @@ export interface ReadDocumentInput {
 
 export interface DocumentPage {
 	page: number;
-	source: "text" | "ocr" | "none";
+	source: "text" | "ocr" | "segra-ocr" | "none";
 	text: string;
 	ocrConfidence?: number;
+}
+
+export interface RemoteOcrImage {
+	data: Buffer;
+	mediaType: "image/png" | "image/jpeg";
+}
+
+/** Optional remote OCR. Returns undefined (or throws) to fall back to tesseract. */
+export type RemoteOcr = (
+	image: RemoteOcrImage,
+	signal?: AbortSignal,
+) => Promise<string | undefined>;
+
+export interface ReadDocumentOptions {
+	remoteOcr?: RemoteOcr;
+	/** For tests; defaults to Date.now. */
+	now?: () => number;
+}
+
+/**
+ * The tool call has 300 s (READ_DOCUMENT_TOOL timeoutMs). Remote OCR gets at
+ * most 30 s per image and stops being tried after 180 s, so the rest of a long
+ * scan goes to tesseract (~0.5 s a page) and the call still finishes in time.
+ */
+export const REMOTE_OCR_PAGE_MS = 30_000;
+export const REMOTE_OCR_BUDGET_MS = 180_000;
+
+function withRemoteOcrBudget(
+	remoteOcr: RemoteOcr | undefined,
+	now: () => number,
+): RemoteOcr | undefined {
+	if (!remoteOcr) return undefined;
+	const deadline = now() + REMOTE_OCR_BUDGET_MS;
+	return async (image) => {
+		const left = deadline - now();
+		if (left <= 0) return undefined;
+		return remoteOcr(
+			image,
+			AbortSignal.timeout(Math.min(REMOTE_OCR_PAGE_MS, left)),
+		);
+	};
+}
+
+async function tryRemoteOcr(
+	remoteOcr: RemoteOcr | undefined,
+	images: RemoteOcrImage[],
+): Promise<string | undefined> {
+	if (!remoteOcr) return undefined;
+	try {
+		const texts: string[] = [];
+		for (const image of images) {
+			const text = (await remoteOcr(image))?.trim();
+			if (!text) return undefined;
+			texts.push(text);
+		}
+		return texts.join("\n").trim() || undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 export interface ReadDocumentResult {
@@ -237,8 +297,13 @@ function isOcrableImage(buf: Uint8Array): boolean {
 
 export async function readDocument(
 	input: ReadDocumentInput,
+	options: ReadDocumentOptions = {},
 ): Promise<ReadDocumentResult> {
 	const { path } = input;
+	const remoteOcr = withRemoteOcrBudget(
+		options.remoteOcr,
+		options.now ?? Date.now,
+	);
 	if (typeof path !== "string" || !isAbsolute(path))
 		fail(`path must be an absolute path, got: ${JSON.stringify(path)}`);
 	let st: Awaited<ReturnType<typeof stat>>;
@@ -275,6 +340,20 @@ export async function readDocument(
 			);
 		if (input.pages && (from !== 1 || to !== 1))
 			notes.push("Images have a single page; the pages range was ignored.");
+		const remote = await tryRemoteOcr(remoteOcr, [
+			{
+				data: Buffer.from(bytes),
+				mediaType: bytes[0] === 0x89 ? "image/png" : "image/jpeg",
+			},
+		]);
+		if (remote !== undefined)
+			return {
+				path,
+				kind: "image",
+				pageCount: 1,
+				pages: [{ page: 1, source: "segra-ocr", text: remote }],
+				notes,
+			};
 		const worker = await startOcrWorker();
 		try {
 			const { data } = await worker.recognize(bytes);
@@ -300,11 +379,12 @@ export async function readDocument(
 	// ---- PDF
 	if (
 		!(
-			bytes.length > 4 &&
-			Buffer.from(bytes.subarray(0, 1024)).includes("%PDF-")
+			bytes.length > 4 && Buffer.from(bytes.subarray(0, 1024)).includes("%PDF-")
 		)
 	)
-		fail(`${basename(path)} is not a valid PDF (no PDF header). It may be corrupt or not a PDF.`);
+		fail(
+			`${basename(path)} is not a valid PDF (no PDF header). It may be corrupt or not a PDF.`,
+		);
 
 	const pdfjs = await loadPdfjs();
 	const task = pdfjs.getDocument({
@@ -341,7 +421,9 @@ export async function readDocument(
 		from = from ?? 1;
 		to = Math.min(to ?? pageCount, pageCount);
 		if (from > pageCount)
-			fail(`Page range starts at ${from} but the document has only ${pageCount} pages.`);
+			fail(
+				`Page range starts at ${from} but the document has only ${pageCount} pages.`,
+			);
 		if (to - from + 1 > MAX_PAGES_PER_CALL) {
 			const newTo = from + MAX_PAGES_PER_CALL - 1;
 			notes.push(
@@ -381,6 +463,17 @@ export async function readDocument(
 			// OCR the large images (tiled scans); skip small logos/stamps.
 			const biggest = Math.max(...images.map((i) => i.area));
 			const chosen = images.filter((i) => i.area >= biggest * 0.25).slice(0, 6);
+			const remote = await tryRemoteOcr(
+				remoteOcr,
+				chosen.map((i) => ({
+					data: Buffer.from(i.png),
+					mediaType: "image/png" as const,
+				})),
+			);
+			if (remote !== undefined) {
+				pages.push({ page: n, source: "segra-ocr", text: remote });
+				continue;
+			}
 			worker ??= await startOcrWorker();
 			const texts: string[] = [];
 			let conf = 0;

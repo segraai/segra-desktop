@@ -61,6 +61,23 @@ describe("AccountContent", () => {
 		expect(text).toContain("42");
 		expect(text).toContain("Free");
 		expect(text).toContain("Try Pro");
+		expect(text).not.toContain("Unlimited-OCR");
+	});
+
+	it("shows the OCR set-aside only for accounts enabled for it", async () => {
+		await renderWith({
+			account: {
+				userId: "atothek",
+				tier: "paid",
+				credits: 600,
+				status: "ok",
+				ocr: { model: "Unlimited-OCR", status: "ready", credits: 99.5 },
+			},
+			signedIn: true,
+		});
+		expect(container.textContent).toContain(
+			"100 credits set aside for reading scans",
+		);
 	});
 
 	it("offers sign-in when signed out", async () => {

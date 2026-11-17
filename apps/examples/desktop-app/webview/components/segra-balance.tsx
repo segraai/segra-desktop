@@ -15,6 +15,12 @@ export type SegraAccount = {
 	tier?: "free" | "paid";
 	credits: number;
 	status: "ok" | "setting_up" | "empty";
+	/** Present only for accounts enabled for Segra's document OCR model. */
+	ocr?: {
+		model: string;
+		status: "ready" | "setting_up" | "empty";
+		credits: number;
+	};
 };
 
 const REFRESH_MS = 30_000;

@@ -1,9 +1,9 @@
-// Runs the segra-accountant plugin through core's real plugin loader in its
+// Runs the segra-documents plugin through core's real plugin loader in its
 // default worker-thread mode and calls every tool through what the loader
 // returns.
 //
 // Run from the repo root:
-//   bun plugins/segra-accountant/scripts/run-in-runtime.ts [plugin-dir]
+//   bun plugins/segra-documents/scripts/run-in-runtime.ts [plugin-dir]
 //
 // Safety: the script creates its own temp CLINE_DIR (never ~/.cline or
 // ~/.segra-desktop) and removes it at the end. It imports core by path
@@ -18,7 +18,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 // e.g. a copy made by `cline plugin install`.
 const repoRoot = resolve(here, "..", "..", "..");
 const pluginDir = process.argv[2] ? resolve(process.argv[2]) : resolve(here, "..");
-const tmp = mkdtempSync(join(tmpdir(), "accountant-runtime-"));
+const tmp = mkdtempSync(join(tmpdir(), "segra-documents-runtime-"));
 process.env.CLINE_DIR = join(tmp, "cline-dir");
 mkdirSync(process.env.CLINE_DIR, { recursive: true });
 delete process.env.CLINE_PLUGIN_MODE; // force the default (worker) mode
@@ -105,14 +105,8 @@ try {
 
 	// --- the real plugin ---
 	const p = await load(join(pluginDir, "index.ts"));
-	console.log(`segra-accountant: loader (import+worker start) ${p.importMs} ms, setup() ${p.setupMs} ms, tools: ${p.tools.map((t) => t.name).join(", ")}`);
+	console.log(`segra-documents: loader (import+worker start) ${p.importMs} ms, setup() ${p.setupMs} ms, tools: ${p.tools.map((t) => t.name).join(", ")}`);
 	const T = p.tools;
-
-	await run("accountant_ping", async () => {
-		const r = await call(T, "accountant_ping", {});
-		if (!JSON.stringify(r).includes('"ok":true')) throw new Error(JSON.stringify(r));
-		return JSON.stringify(r);
-	});
 
 	const xlsx = join(tmp, "out.xlsx");
 	await run("write_workbook (SUM formula)", async () => {

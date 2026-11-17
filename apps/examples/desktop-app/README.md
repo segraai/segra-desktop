@@ -355,10 +355,36 @@ Three things keep the feature off:
   the background.
 - Feature flags are never fetched from Cline (`sidecar/feature-flags.ts` uses `NoOpFeatureFlagsProvider`), so the
   cloud-sessions flag keeps its local default, which is off.
-- In accountant mode the webview also ignores the flag: `cloudAgentsEnabled` in `webview/app/page.tsx` is false, and the
+- In normal mode the webview also ignores the flag: `cloudAgentsEnabled` in `webview/app/page.tsx` is false, and the
   welcome screen hides the repository, branch and cloud sign-in controls.
 
 Don't add a remote flag provider or remove that environment variable without replacing these guards.
+
+## Normal and Developer modes
+
+Settings → General → Mode switches between **Normal** (the default) and **Developer**. The mode is stored in the
+webview (`webview/lib/app-mode.ts`); a value saved by older builds as `"accountant"` reads as Normal. Normal mode hides
+the coding UI (git branches, worktrees, pull requests, diffs, remote and cloud environments), says "folder" instead of
+workspace or project, shows starting points on the welcome screen and document checks in Schedules, and hides the
+Import, Remote and Marketplace settings. The info icon next to the setting lists the same differences
+(`NORMAL_MODE_DIFFERENCES` in `settings-view.tsx`).
+
+## Built-in document tools
+
+Every local session, in either mode, gets two extra tools:
+
+- `read_document`: text from PDFs, and OCR for scans and photos (.png, .jpg, .jpeg). Accounts Segra has enabled for it use Segra's "Unlimited-OCR" TEE model (`sidecar/segra-ocr.ts`; pages are sent only to the attested enclave, results are marked `segra-ocr`); everyone else, and any failure, falls back to offline tesseract.
+- `write_workbook`: Excel files whose totals are formulas.
+
+They come from the repo's `plugins/segra-documents` but are not installed as a plugin. `bun run build:runtime` copies
+the folder into `src-tauri/bin/segra-plugins/segra-documents` with a production install of its dependencies (pdf.js,
+tesseract.js, exceljs and the platform's canvas addon; both macOS architectures for a universal build) and removes
+files they never load, about 150 MB on Linux. The install is reused while `package.json`, `bun.lock` and the target
+stay the same. The Rust shell passes that folder as `SEGRA_PLUGINS_DIR`, and `sidecar/document-tools.ts` imports it at
+runtime and adds the tools to each session as extra tools. The hub routes their calls back to the sidecar, so they run
+next to the user's files. SSH sessions don't get them, because the files are on the other machine.
+
+`bun run dev:sidecar` falls back to `plugins/segra-documents` in the repo, which needs its own `bun install`.
 
 ## Sidecar observability
 

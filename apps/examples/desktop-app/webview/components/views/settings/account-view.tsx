@@ -120,6 +120,13 @@ function SignInCard() {
 	);
 }
 
+/** Only accounts Segra enabled for its document OCR model have this. */
+function ocrText(ocr: NonNullable<SegraAccount["ocr"]>): string {
+	if (ocr.status === "setting_up") return "Setting up…";
+	if (ocr.status === "empty") return "Set-aside used up";
+	return `${formatCredits(ocr.credits)} credits set aside for reading scans`;
+}
+
 /** Settings → Account: the signed-in Segra account's ID and credits. */
 export function AccountContent({
 	onManageSegra,
@@ -211,6 +218,9 @@ export function AccountContent({
 								{statusText(account)}
 							</span>
 						</Row>
+						{account.ocr ? (
+							<Row label="Unlimited-OCR">{ocrText(account.ocr)}</Row>
+						) : null}
 					</dl>
 				</section>
 				<div className="flex justify-end">

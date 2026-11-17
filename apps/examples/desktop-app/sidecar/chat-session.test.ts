@@ -33,8 +33,14 @@ import {
 } from "./context";
 import type { SidecarContext } from "./types";
 
-const { createContextCompactionPrepareTurnMock } = vi.hoisted(() => ({
-	createContextCompactionPrepareTurnMock: vi.fn(),
+const { createContextCompactionPrepareTurnMock, loadDocumentToolsMock } =
+	vi.hoisted(() => ({
+		createContextCompactionPrepareTurnMock: vi.fn(),
+		loadDocumentToolsMock: vi.fn(async () => [] as unknown[]),
+	}));
+
+vi.mock("./document-tools", () => ({
+	loadDocumentTools: loadDocumentToolsMock,
 }));
 
 vi.mock("@cline/core", async (importOriginal) => {
@@ -3174,5 +3180,83 @@ describe("queue steering routing", () => {
 			});
 			expect(steerFirst).not.toHaveBeenCalled();
 		}
+	});
+});
+
+describe("built-in document tools", () => {
+	const documentTool = {
+		name: "read_document",
+		description: "Reads a document.",
+		inputSchema: { type: "object", properties: {} },
+		execute: async () => ({}),
+	};
+
+	afterEach(() => {
+		loadDocumentToolsMock.mockReset();
+		loadDocumentToolsMock.mockImplementation(async () => []);
+	});
+
+	it("adds them to local sessions as extra tools", async () => {
+		loadDocumentToolsMock.mockImplementation(async () => [documentTool]);
+		const start = vi.fn(
+			async (_input: {
+				config: Record<string, unknown>;
+				localRuntime?: { extraTools?: unknown[] };
+			}) => ({
+				sessionId: "session-docs",
+				manifest: { cwd: "/workspace", workspace_root: "/workspace" },
+				manifestPath: "/tmp/session-docs.json",
+				messagesPath: "/tmp/session-docs.messages.json",
+			}),
+		);
+		const ctx = {
+			liveSessions: new Map(),
+			restoringWorkspacePaths: new Set(),
+			...localRuntimeContext({ start }),
+		} as unknown as SidecarContext;
+
+		await handleChatSessionCommand(ctx, {
+			action: "start",
+			config: { provider: "deepseek", model: "deepseek-chat" },
+		});
+
+		const input = start.mock.calls[0]?.[0];
+		expect(input?.localRuntime?.extraTools).toEqual([documentTool]);
+		expect(input?.config).not.toHaveProperty("extraTools");
+	});
+
+	it("leaves them out of sessions on a remote machine", async () => {
+		loadDocumentToolsMock.mockImplementation(async () => [documentTool]);
+		const sessionId = "session-ssh-docs";
+		const environmentId = "ssh-docs";
+		const start = vi.fn(
+			async (_input: { localRuntime?: { extraTools?: unknown[] } }) => ({
+				sessionId,
+				manifest: { cwd: "/remote", workspace_root: "/remote" },
+			}),
+		);
+		const ctx = {
+			liveSessions: new Map(),
+			sessionEnvironmentIds: new Map(),
+			runtimeBindings: new Map([
+				[
+					environmentId,
+					{
+						environmentId,
+						kind: "ssh",
+						sessionManager: { readMessages: vi.fn(async () => []), start },
+					},
+				],
+			]),
+		} as unknown as SidecarContext;
+
+		await handleChatSessionCommand(getEnvironmentContext(ctx, environmentId), {
+			action: "start",
+			config: { sessionId, environmentId },
+		});
+
+		expect(start).toHaveBeenCalledOnce();
+		expect(start.mock.calls[0]?.[0].localRuntime?.extraTools).toBeUndefined();
+		expect(loadDocumentToolsMock).not.toHaveBeenCalled();
 	});
 });

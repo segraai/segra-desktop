@@ -1,4 +1,13 @@
-import { cpSync, existsSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+	cpSync,
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { fileURLToPath } from "node:url";
 import { $ } from "bun";
 import {
@@ -149,6 +158,138 @@ const buildUniversalMacCli = async (): Promise<void> => {
 	await $`lipo -info ${outfile}`;
 };
 
+// Folders from the repo's plugins/ that ship with the app (resource folder
+// bin/segra-plugins). "segra-claude-mem" is offered in the Marketplace's
+// "Segra Recommended" section (sidecar/segra-recommended.ts); "segra-documents"
+// holds the built-in document tools (sidecar/document-tools.ts).
+export const SEGRA_BUNDLED_PLUGINS = [
+	"segra-claude-mem",
+	"segra-documents",
+] as const;
+
+const DEPS_STAMP = ".segra-deps-stamp";
+
+/** Source files that stay out of the app: tests, fixtures and dev scripts. */
+export const isBundledPluginSource = (source: string): boolean =>
+	!/(^|[\\/])(node_modules|fixtures|scripts)([\\/]|$)/.test(source) &&
+	!/\.test\.[cm]?[jt]s$/.test(source) &&
+	!/(^|[\\/])(SPIKE_REPORT\.md|\.segra-deps-stamp)$/.test(source);
+
+const hasDependencies = (dir: string): boolean => {
+	const pkg = JSON.parse(readFileSync(`${dir}/package.json`, "utf8")) as {
+		dependencies?: Record<string, string>;
+	};
+	return Object.keys(pkg.dependencies ?? {}).length > 0;
+};
+
+/** Changes whenever the installed dependencies would. */
+const depsStamp = (dir: string, targetTriple: string): string => {
+	const hash = createHash("sha256");
+	for (const file of ["package.json", "bun.lock"]) {
+		if (existsSync(`${dir}/${file}`))
+			hash.update(readFileSync(`${dir}/${file}`));
+	}
+	hash.update(targetTriple);
+	return hash.digest("hex");
+};
+
+/**
+ * Removes installed files the tools never load at runtime: source maps, type
+ * declarations, `.bin` links, pdf.js's modern build and viewer (the tools use
+ * its legacy build), tesseract's browser-only `.wasm.js` copies, and the musl
+ * builds of the canvas addon on glibc Linux targets.
+ */
+export const trimBundledDeps = (dest: string, targetTriple: string): void => {
+	const modules = `${dest}/node_modules`;
+	for (const sub of [
+		".bin",
+		"@types",
+		"pdfjs-dist/build",
+		"pdfjs-dist/web",
+		"pdfjs-dist/types",
+	]) {
+		rmSync(`${modules}/${sub}`, { recursive: true, force: true });
+	}
+	const patterns = ["**/*.map", "**/*.d.ts", "**/*.d.mts", "**/*.d.cts"];
+	patterns.push("tesseract.js-core/*.wasm.js");
+	if (
+		targetTriple.endsWith("-linux-gnu") &&
+		existsSync(`${modules}/@napi-rs`)
+	) {
+		for (const entry of readdirSync(`${modules}/@napi-rs`)) {
+			if (entry.endsWith("-musl")) {
+				rmSync(`${modules}/@napi-rs/${entry}`, {
+					recursive: true,
+					force: true,
+				});
+			}
+		}
+	}
+	for (const pattern of patterns) {
+		for (const file of new Bun.Glob(pattern).scanSync({
+			cwd: modules,
+			dot: true,
+		})) {
+			rmSync(`${modules}/${file}`, { force: true });
+		}
+	}
+};
+
+/**
+ * Copies the bundled plugin folders into the app's resources. A folder with
+ * dependencies gets its own production install (`node_modules`, real
+ * directories, native packages for the target platform; both macOS
+ * architectures for a universal build). The install is kept between builds
+ * while package.json, bun.lock and the target stay the same.
+ */
+export const copySegraPlugins = async (
+	repoRoot = REPO_ROOT,
+	binDir = BIN_DIR,
+	targetTriple = "",
+): Promise<void> => {
+	const target = `${binDir}/segra-plugins`;
+	mkdirSync(target, { recursive: true });
+	for (const entry of readdirSync(target)) {
+		if (!(SEGRA_BUNDLED_PLUGINS as readonly string[]).includes(entry)) {
+			rmSync(`${target}/${entry}`, { recursive: true, force: true });
+		}
+	}
+	for (const name of SEGRA_BUNDLED_PLUGINS) {
+		const source = `${repoRoot}/plugins/${name}`;
+		const dest = `${target}/${name}`;
+		const needsDeps = hasDependencies(source);
+		const stamp = needsDeps ? depsStamp(source, targetTriple) : "";
+		const keepDeps =
+			needsDeps &&
+			existsSync(`${dest}/node_modules`) &&
+			existsSync(`${dest}/${DEPS_STAMP}`) &&
+			readFileSync(`${dest}/${DEPS_STAMP}`, "utf8") === stamp;
+		if (existsSync(dest)) {
+			for (const entry of readdirSync(dest)) {
+				if (keepDeps && (entry === "node_modules" || entry === DEPS_STAMP)) {
+					continue;
+				}
+				rmSync(`${dest}/${entry}`, { recursive: true, force: true });
+			}
+		}
+		cpSync(source, dest, {
+			recursive: true,
+			filter: (path) =>
+				path === source || isBundledPluginSource(path.slice(source.length)),
+		});
+		if (!needsDeps || keepDeps) continue;
+		const platformFlags =
+			targetTriple === "universal-apple-darwin"
+				? ["--os=darwin", "--cpu=*"]
+				: [];
+		await $`bun install --production --frozen-lockfile --linker=hoisted --no-save ${platformFlags}`.cwd(
+			dest,
+		);
+		trimBundledDeps(dest, targetTriple);
+		writeFileSync(`${dest}/${DEPS_STAMP}`, stamp);
+	}
+};
+
 const hasOpenTuiNativeVariant = (os: string, arch: string): boolean =>
 	existsSync(`${REPO_ROOT}/node_modules/.bun`) &&
 	[
@@ -190,6 +331,7 @@ const main = async () => {
 	await buildRemoteClis();
 	// The local model engine (resource folder bin/llama); cached by version.
 	await fetchLlamaServer(targetTriple);
+	await copySegraPlugins(REPO_ROOT, BIN_DIR, targetTriple);
 };
 
 if (import.meta.main) {

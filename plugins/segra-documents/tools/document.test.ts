@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Worker } from "node:worker_threads";
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { MAX_PAGES_PER_CALL, readDocument } from "./document-core.ts";
+import {
+	MAX_PAGES_PER_CALL,
+	REMOTE_OCR_BUDGET_MS,
+	readDocument,
+} from "./document-core.ts";
 
 const fx = (name: string) => join(import.meta.dir, "..", "fixtures", name);
 const timings: Record<string, number> = {};
@@ -44,8 +48,9 @@ async function makePdf(pageCount: number): Promise<string> {
 
 describe("timings", () => {
 	test("first import of pdfjs", async () => {
-		await timed("pdfjs first import", () =>
-			import("pdfjs-dist/legacy/build/pdf.mjs"),
+		await timed(
+			"pdfjs first import",
+			() => import("pdfjs-dist/legacy/build/pdf.mjs"),
 		);
 	});
 });
@@ -183,15 +188,15 @@ describe("page ranges", () => {
 
 describe("errors", () => {
 	test("missing file", async () => {
-		await expect(
-			readDocument({ path: join(tmp, "nope.pdf") }),
-		).rejects.toThrow(/File not found/);
+		await expect(readDocument({ path: join(tmp, "nope.pdf") })).rejects.toThrow(
+			/File not found/,
+		);
 	});
 
 	test("relative path", async () => {
-		await expect(readDocument({ path: "fixtures/t4-text.pdf" })).rejects.toThrow(
-			/absolute/,
-		);
+		await expect(
+			readDocument({ path: "fixtures/t4-text.pdf" }),
+		).rejects.toThrow(/absolute/);
 	});
 
 	test("unsupported extension", async () => {
@@ -202,10 +207,11 @@ describe("errors", () => {
 
 	test("garbage file named .pdf", async () => {
 		const p = join(tmp, "garbage.pdf");
-		writeFileSync(p, "this is definitely not a pdf, just some text\n".repeat(20));
-		await expect(readDocument({ path: p })).rejects.toThrow(
-			/not a valid PDF/,
+		writeFileSync(
+			p,
+			"this is definitely not a pdf, just some text\n".repeat(20),
 		);
+		await expect(readDocument({ path: p })).rejects.toThrow(/not a valid PDF/);
 	});
 
 	test("truncated PDF", async () => {
@@ -273,5 +279,75 @@ describe("offline", () => {
 		await w.terminate();
 		expect(out.fetch).toMatch(/Network access is disabled/);
 		expect(out.net).toMatch(/Network access is disabled/);
+	});
+});
+
+describe("remote OCR", () => {
+	test("is used for images and scanned pages, not for text pages", async () => {
+		const calls: string[] = [];
+		const remoteOcr = async (image: { mediaType: string }) => {
+			calls.push(image.mediaType);
+			return "REMOTE 68,450.00";
+		};
+		const img = await readDocument({ path: fx("t4-scan.png") }, { remoteOcr });
+		expect(img.pages[0]).toEqual({
+			page: 1,
+			source: "segra-ocr",
+			text: "REMOTE 68,450.00",
+		});
+		const jpg = await readDocument({ path: fx("t4-scan.jpg") }, { remoteOcr });
+		expect(jpg.pages[0].source).toBe("segra-ocr");
+		expect(calls).toEqual(["image/png", "image/jpeg"]);
+		const before = calls.length;
+		const mixed = await readDocument(
+			{ path: fx("two-page-mixed.pdf") },
+			{ remoteOcr },
+		);
+		expect(mixed.pages.map((p) => p.source)).toEqual(["text", "segra-ocr"]);
+		expect(mixed.pages[1].ocrConfidence).toBeUndefined();
+		expect(calls.length).toBeGreaterThan(before);
+		const textOnly = await readDocument(
+			{ path: await makePdf(1) },
+			{ remoteOcr: async () => fail("must not be called") },
+		);
+		expect(textOnly.pages[0].source).toBe("text");
+	});
+
+	test("falls back to offline OCR when it throws or returns nothing", async () => {
+		for (const remoteOcr of [
+			async () => {
+				throw new Error("boom");
+			},
+			async () => undefined,
+			async () => "  ",
+		]) {
+			const r = await readDocument({ path: fx("t4-scan.png") }, { remoteOcr });
+			expect(r.pages[0].source).toBe("ocr");
+			expect(r.pages[0].text).toContain("68,450.00");
+		}
+	});
+
+	test("stops using remote OCR once its time budget is spent", async () => {
+		const signals: (AbortSignal | undefined)[] = [];
+		const remoteOcr = async (_image: unknown, signal?: AbortSignal) => {
+			signals.push(signal);
+			return "PAGE TEXT FROM REMOTE";
+		};
+		// Within the budget: remote OCR, with a per-page timeout signal.
+		const fast = await readDocument(
+			{ path: fx("t4-scan.png") },
+			{ remoteOcr, now: () => 0 },
+		);
+		expect(fast.pages[0].source).toBe("segra-ocr");
+		expect(signals[0]).toBeInstanceOf(AbortSignal);
+		// The clock passes the deadline before the page is sent: tesseract.
+		let calls = 0;
+		const slow = await readDocument(
+			{ path: fx("t4-scan.png") },
+			{ remoteOcr, now: () => (calls++ === 0 ? 0 : REMOTE_OCR_BUDGET_MS + 1) },
+		);
+		expect(slow.pages[0].source).toBe("ocr");
+		expect(slow.pages[0].text).toContain("68,450.00");
+		expect(signals).toHaveLength(1);
 	});
 });

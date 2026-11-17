@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import {
+	type AgentTool,
 	buildConnectionUpdate,
 	buildWorkspaceMetadata,
 	type ClineCore,
@@ -60,13 +61,14 @@ import {
 	requestSidecarAskQuestion,
 	sendEvent,
 } from "./context";
+import { loadDocumentTools } from "./document-tools";
 import { isCloudAgentsEnabled } from "./feature-flags";
-import { readSessionManifest, sharedSessionDataDir } from "./paths";
-import { runPluginSlashCommand } from "./plugin-commands";
 import {
 	buildLocalModelSystemPrompt,
 	isLocalModelProvider,
 } from "./local-model-prompt";
+import { readSessionManifest, sharedSessionDataDir } from "./paths";
+import { runPluginSlashCommand } from "./plugin-commands";
 import { derivePromptFromMessages } from "./session-data/common";
 import { persistSessionMessages } from "./session-data/messages";
 import type {
@@ -681,10 +683,24 @@ export function createDesktopMistakeRecovery(
 	};
 }
 
+/**
+ * Tools this backend adds to a session: the built-in document tools. They run
+ * in this process against local files, so sessions on a remote (SSH) machine
+ * do not get them.
+ */
+async function sessionExtraTools(
+	ctx: SidecarContext,
+	binding: Pick<SessionRuntimeBinding, "kind">,
+): Promise<AgentTool[] | undefined> {
+	if (binding.kind === "ssh") return undefined;
+	return loadDocumentTools(ctx.logger);
+}
+
 function buildCoreSessionConfig(
 	config: JsonRecord,
 	telemetryUser?: SidecarContext["telemetryUser"],
 	mistakeRecovery?: ReturnType<typeof createDesktopMistakeRecovery>,
+	extraTools?: AgentTool[],
 ): JsonRecord {
 	const rawWorkspaceRoot = config.workspaceRoot ?? config.workspace_root;
 	const workspaceRoot =
@@ -737,6 +753,7 @@ function buildCoreSessionConfig(
 		initialMessages: config.initialMessages,
 		extensionContext: createDesktopExtensionContext(telemetryUser),
 		...mistakeRecovery,
+		...(extraTools?.length ? { extraTools } : {}),
 	};
 }
 
@@ -1112,6 +1129,7 @@ async function handleStart(
 			config,
 			ctx.telemetryUser,
 			createDesktopMistakeRecovery(ctx, () => startedSessionId),
+			await sessionExtraTools(ctx, binding),
 		),
 		systemPrompt,
 		...(initialMessages ? { initialMessages } : {}),
@@ -1287,6 +1305,7 @@ async function startRebuiltSession(
 	systemPrompt: string,
 	messages: MessageWithMetadata[],
 	compactionState: SessionCompactionState | undefined,
+	extraTools?: AgentTool[],
 ): Promise<void> {
 	const projectedMessages = compactionState
 		? projectSessionCompactionState(compactionState, messages)
@@ -1301,6 +1320,7 @@ async function startRebuiltSession(
 				},
 				ctx.telemetryUser,
 				createDesktopMistakeRecovery(ctx, () => sessionId),
+				extraTools,
 			) as unknown as ClineCoreStartConfig,
 		),
 		source: SessionSource.DESKTOP,
@@ -1371,6 +1391,7 @@ async function rebuildSessionForProviderChange(
 			nextSystemPrompt,
 			messages,
 			compactionState,
+			await sessionExtraTools(ctx, binding),
 		);
 		replacementStarted = true;
 		// Reusing a session id preserves its existing manifest. Treat refreshing
@@ -1393,6 +1414,7 @@ async function rebuildSessionForProviderChange(
 				previousSystemPrompt,
 				messages,
 				compactionState,
+				await sessionExtraTools(ctx, binding),
 			);
 			await manager.updateSessionConnection(
 				sessionId,
@@ -1611,6 +1633,7 @@ async function recoverSessionAfterHubLoss(
 						systemPrompt,
 						readPersistedChatMessages(sessionId) ?? session.messages ?? [],
 						compactionState,
+						await loadDocumentTools(ctx.logger),
 					);
 					if (!stillWanted()) {
 						// Undo a cancelled rebuild only while the projection still
@@ -2197,6 +2220,7 @@ async function handleForkUnlocked(
 				},
 				ctx.telemetryUser,
 				createDesktopMistakeRecovery(ctx, () => newSessionId),
+				await sessionExtraTools(ctx, binding),
 			) as unknown as ClineCoreStartConfig,
 		),
 		source: SessionSource.DESKTOP,
@@ -2363,6 +2387,7 @@ async function handleRestoreCheckpoint(
 						},
 						ctx.telemetryUser,
 						createDesktopMistakeRecovery(ctx, () => restoredSessionId),
+						await sessionExtraTools(ctx, binding),
 					) as unknown as ClineCoreStartConfig,
 				),
 				source: SessionSource.DESKTOP,
