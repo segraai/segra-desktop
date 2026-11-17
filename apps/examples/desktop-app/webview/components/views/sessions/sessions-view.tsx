@@ -20,7 +20,14 @@ import {
 	Trash2,
 	X,
 } from "lucide-react";
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import {
+	type CSSProperties,
+	type MouseEvent as ReactMouseEvent,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { ImportSessionsDialog } from "@/components/import-sessions-dialog";
 import {
 	AlertDialog,
@@ -33,6 +40,7 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
 	DropdownMenu,
 	DropdownMenuCheckboxItem,
@@ -52,6 +60,7 @@ import {
 	sessionActivityTimestamp,
 	type UseSessionHistoryResult,
 } from "@/hooks/use-session-history";
+import { toast } from "@/hooks/use-toast";
 import type { SessionHistoryItem } from "@/lib/session-history";
 import { sessionStatusColor, sessionStatusTone } from "@/lib/session-status";
 import { cn } from "@/lib/utils";
@@ -64,6 +73,14 @@ type SessionsViewProps = {
 };
 
 const PAGE_SIZE = 10;
+
+const BULK_TASK_WORKTREE_DELETE_WARNING =
+	"Some of these sessions ran in their own git worktrees. Deleting them also removes those worktrees and their generated branches, including any uncommitted changes in them.";
+
+// Radix renders the check icon for the indeterminate state too, so swap it
+// for a dash. The shared Checkbox has no indeterminate styling of its own.
+const INDETERMINATE_CHECKBOX_CLASS =
+	"data-[state=indeterminate]:relative data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:[&_svg]:hidden data-[state=indeterminate]:after:absolute data-[state=indeterminate]:after:inset-x-[3px] data-[state=indeterminate]:after:top-1/2 data-[state=indeterminate]:after:h-0.5 data-[state=indeterminate]:after:-translate-y-1/2 data-[state=indeterminate]:after:rounded data-[state=indeterminate]:after:bg-primary-foreground";
 
 function modelLabel(thread: SessionThread): string {
 	if (thread.provider && thread.model) {
@@ -166,6 +183,19 @@ export function SessionsView({ activeSessionId, history }: SessionsViewProps) {
 		null,
 	);
 	const [page, setPage] = useState(0);
+	const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(
+		() => new Set(),
+	);
+	// Frozen at the moment "Delete" is clicked so the dialog wording and the
+	// progress total stay stable while rows disappear underneath it.
+	const [bulkCandidates, setBulkCandidates] = useState<SessionThread[] | null>(
+		null,
+	);
+	const [bulkProgress, setBulkProgress] = useState<{
+		current: number;
+		total: number;
+	} | null>(null);
+	const lastClickedIdRef = useRef<string | null>(null);
 	const requiresCompleteHistory =
 		query.trim().length > 0 ||
 		sessionFilters.length > 0 ||
@@ -264,6 +294,19 @@ export function SessionsView({ activeSessionId, history }: SessionsViewProps) {
 		[history.requestUsage],
 	);
 
+	// Selection is by session id and only ever holds rows on the visible page:
+	// drop ids that were deleted elsewhere or moved off the page.
+	useEffect(() => {
+		setSelectedIds((current) => {
+			if (current.size === 0) {
+				return current;
+			}
+			const visible = new Set(visibleThreads.map((thread) => thread.id));
+			const next = new Set([...current].filter((id) => visible.has(id)));
+			return next.size === current.size ? current : next;
+		});
+	}, [visibleThreads]);
+
 	// Snap back when a page disappears (filters changed, or "next" asked the
 	// backend for older sessions and there were none left).
 	useEffect(() => {
@@ -273,7 +316,17 @@ export function SessionsView({ activeSessionId, history }: SessionsViewProps) {
 	// biome-ignore lint/correctness/useExhaustiveDependencies: restart paging whenever the result set changes
 	useEffect(() => {
 		setPage(0);
+		setSelectedIds(new Set());
+		lastClickedIdRef.current = null;
 	}, [query, sessionFilters, sortDirection]);
+
+	const changePage = (nextPage: number) => {
+		// Selection never carries across pages, so "Delete" always acts on rows
+		// the user can see.
+		setSelectedIds(new Set());
+		lastClickedIdRef.current = null;
+		setPage(nextPage);
+	};
 
 	const goToNextPage = async () => {
 		const nextPage = currentPage + 1;
@@ -289,7 +342,7 @@ export function SessionsView({ activeSessionId, history }: SessionsViewProps) {
 				return;
 			}
 		}
-		setPage(nextPage);
+		changePage(nextPage);
 	};
 
 	const toggleFilter = (detail: string, checked: boolean) => {
@@ -338,6 +391,99 @@ export function SessionsView({ activeSessionId, history }: SessionsViewProps) {
 			setDeleteCandidate(null);
 		}
 	};
+
+	const selectedThreads = visibleThreads.filter((thread) =>
+		selectedIds.has(thread.id),
+	);
+	const allOnPageSelected =
+		visibleThreads.length > 0 &&
+		selectedThreads.length === visibleThreads.length;
+	const isBulkDeleting = bulkProgress !== null;
+
+	const toggleAllOnPage = () => {
+		lastClickedIdRef.current = null;
+		setSelectedIds(
+			allOnPageSelected
+				? new Set()
+				: new Set(visibleThreads.map((thread) => thread.id)),
+		);
+	};
+
+	const toggleRowSelection = (id: string, shiftKey: boolean) => {
+		const anchorId = lastClickedIdRef.current;
+		const anchorIndex = anchorId
+			? visibleThreads.findIndex((thread) => thread.id === anchorId)
+			: -1;
+		const index = visibleThreads.findIndex((thread) => thread.id === id);
+		setSelectedIds((current) => {
+			const next = new Set(current);
+			if (shiftKey && anchorIndex >= 0 && index >= 0) {
+				const from = Math.min(anchorIndex, index);
+				const to = Math.max(anchorIndex, index);
+				for (const thread of visibleThreads.slice(from, to + 1)) {
+					next.add(thread.id);
+				}
+			} else if (next.has(id)) {
+				next.delete(id);
+			} else {
+				next.add(id);
+			}
+			return next;
+		});
+		lastClickedIdRef.current = id;
+	};
+
+	const confirmBulkDelete = async () => {
+		if (!bulkCandidates || isBulkDeleting) {
+			return;
+		}
+		const candidates = bulkCandidates;
+		const failedIds: string[] = [];
+		let deletedCount = 0;
+		// One at a time through the normal delete path so every per-session side
+		// effect still runs. The hook's pendingAction is a single slot, so
+		// concurrent calls would race on it.
+		for (const [index, candidate] of candidates.entries()) {
+			setBulkProgress({ current: index + 1, total: candidates.length });
+			let deleted = false;
+			try {
+				deleted = Boolean(await history.deleteThread(candidate.id));
+			} catch {
+				deleted = false;
+			}
+			if (deleted) {
+				deletedCount += 1;
+			} else {
+				failedIds.push(candidate.id);
+			}
+		}
+		setBulkProgress(null);
+		setBulkCandidates(null);
+		lastClickedIdRef.current = null;
+		setSelectedIds(new Set(failedIds));
+		const noun = (count: number) => (count === 1 ? "session" : "sessions");
+		if (failedIds.length === 0) {
+			toast({
+				title: `Deleted ${deletedCount} ${noun(deletedCount)}`,
+			});
+		} else {
+			toast({
+				variant: "destructive",
+				title: `Deleted ${deletedCount} of ${candidates.length} ${noun(candidates.length)}`,
+				description: `${failedIds.length} could not be deleted and ${failedIds.length === 1 ? "is" : "are"} still selected.`,
+			});
+		}
+	};
+
+	const bulkCount = bulkCandidates?.length ?? 0;
+	const bulkHasCloud = bulkCandidates?.some(
+		(thread) => thread.origin === "cloud",
+	);
+	const bulkHasWorktree = bulkCandidates?.some(
+		(thread) =>
+			thread.origin !== "cloud" &&
+			isTaskWorktreePath(thread.workspacePath ?? ""),
+	);
 
 	return (
 		<div className="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground">
@@ -453,8 +599,60 @@ export function SessionsView({ activeSessionId, history }: SessionsViewProps) {
 			</header>
 
 			<section className="min-h-0 flex-1 overflow-auto px-18 pb-10 max-[1200px]:px-8 max-[720px]:px-4">
+				{/* The slot is always reserved so the table does not jump when the
+				    first row is ticked. */}
+				<div className="mb-3 flex min-h-9 min-w-240 items-center">
+					{selectedThreads.length > 0 ? (
+						<div className="flex w-full items-center gap-3 rounded-lg border bg-muted/40 px-4 py-1.5 text-sm">
+							<span className="font-medium" aria-live="polite">
+								{selectedThreads.length} selected
+							</span>
+							<div className="ml-auto flex items-center gap-2">
+								<Button
+									className="h-7 rounded-md px-2.5"
+									disabled={isBulkDeleting}
+									onClick={() => setBulkCandidates(selectedThreads)}
+									size="sm"
+									type="button"
+									variant="destructive"
+								>
+									<Trash2 className="size-4" />
+									Delete
+								</Button>
+								<Button
+									className="h-7 rounded-md px-2.5"
+									disabled={isBulkDeleting}
+									onClick={() => {
+										setSelectedIds(new Set());
+										lastClickedIdRef.current = null;
+									}}
+									size="sm"
+									type="button"
+									variant="outline"
+								>
+									Clear
+								</Button>
+							</div>
+						</div>
+					) : null}
+				</div>
 				<div className="min-w-240 overflow-hidden rounded-lg border bg-card">
-					<div className="grid grid-cols-[minmax(14rem,1.35fr)_minmax(9rem,0.8fr)_minmax(12rem,1fr)_7rem_5rem_6rem_1.75rem] gap-x-4 bg-muted/40 px-4 py-3 text-sm font-medium text-muted-foreground">
+					<div className="grid grid-cols-[1.25rem_minmax(14rem,1.35fr)_minmax(9rem,0.8fr)_minmax(12rem,1fr)_7rem_5rem_6rem_1.75rem] gap-x-4 bg-muted/40 px-4 py-3 text-sm font-medium text-muted-foreground">
+						<div className="flex items-center">
+							<Checkbox
+								aria-label="Select all on this page"
+								checked={
+									allOnPageSelected
+										? true
+										: selectedThreads.length > 0
+											? "indeterminate"
+											: false
+								}
+								className={INDETERMINATE_CHECKBOX_CLASS}
+								disabled={visibleThreads.length === 0 || isBulkDeleting}
+								onCheckedChange={toggleAllOnPage}
+							/>
+						</div>
 						<span>Title</span>
 						<span>Workspace</span>
 						<span>Model</span>
@@ -498,13 +696,32 @@ export function SessionsView({ activeSessionId, history }: SessionsViewProps) {
 									className={cn(
 										// Fixed height: every row is the same size so the table
 										// never reflows as long values wrap or hydrate in.
-										"grid h-14 grid-cols-[minmax(14rem,1.35fr)_minmax(9rem,0.8fr)_minmax(12rem,1fr)_7rem_5rem_6rem_1.75rem] items-center gap-x-4 border-t px-4 text-sm transition-colors",
+										"grid h-14 grid-cols-[1.25rem_minmax(14rem,1.35fr)_minmax(9rem,0.8fr)_minmax(12rem,1fr)_7rem_5rem_6rem_1.75rem] items-center gap-x-4 border-t px-4 text-sm transition-colors",
 										activeSessionId === thread.id
 											? "bg-surface-hover"
 											: "hover:bg-surface-hover-lighter",
 									)}
 									key={thread.id}
 								>
+									{/* A sibling of the clickable cells, so ticking never opens the
+									    session or interferes with selecting row text. Shift+mousedown
+									    is cancelled so range-ticking does not select page text. */}
+									<div className="flex select-none items-center">
+										<Checkbox
+											aria-label={`Select "${thread.title}"`}
+											checked={selectedIds.has(thread.id)}
+											className={INDETERMINATE_CHECKBOX_CLASS}
+											disabled={isBulkDeleting}
+											onClick={(event: ReactMouseEvent) =>
+												toggleRowSelection(thread.id, event.shiftKey)
+											}
+											onMouseDown={(event: ReactMouseEvent) => {
+												if (event.shiftKey) {
+													event.preventDefault();
+												}
+											}}
+										/>
+									</div>
 									{isEditing ? (
 										<form
 											className="col-span-6 grid grid-cols-[minmax(14rem,1.35fr)_minmax(9rem,0.8fr)_minmax(12rem,1fr)_7rem_5rem_6rem] items-center gap-x-4"
@@ -730,7 +947,7 @@ export function SessionsView({ activeSessionId, history }: SessionsViewProps) {
 										aria-label="First page"
 										className="h-8 rounded-md px-2.5"
 										disabled={currentPage === 0 || history.isLoadingMore}
-										onClick={() => setPage(0)}
+										onClick={() => changePage(0)}
 										size="sm"
 										title="First page"
 										type="button"
@@ -742,7 +959,7 @@ export function SessionsView({ activeSessionId, history }: SessionsViewProps) {
 										aria-label="Previous page"
 										className="h-8 rounded-md px-2.5"
 										disabled={currentPage === 0 || history.isLoadingMore}
-										onClick={() => setPage(currentPage - 1)}
+										onClick={() => changePage(currentPage - 1)}
 										size="sm"
 										title="Previous page"
 										type="button"
@@ -760,7 +977,7 @@ export function SessionsView({ activeSessionId, history }: SessionsViewProps) {
 												className="h-8 min-w-8 rounded-md px-2 tabular-nums"
 												disabled={history.isLoadingMore}
 												key={item}
-												onClick={() => setPage(item - 1)}
+												onClick={() => changePage(item - 1)}
 												size="sm"
 												type="button"
 												variant={item === currentPage + 1 ? "default" : "ghost"}
@@ -841,6 +1058,54 @@ export function SessionsView({ activeSessionId, history }: SessionsViewProps) {
 								<>
 									<Loader2 className="size-4 animate-spin" />
 									Deleting...
+								</>
+							) : (
+								"Delete"
+							)}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			<AlertDialog
+				open={bulkCandidates !== null}
+				onOpenChange={(open) => {
+					if (!open && !isBulkDeleting) {
+						setBulkCandidates(null);
+					}
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>
+							{`Delete ${bulkCount} ${bulkCount === 1 ? "session" : "sessions"}?`}
+						</AlertDialogTitle>
+						<AlertDialogDescription>
+							{`This removes ${bulkCount} ${bulkCount === 1 ? "session" : "sessions"} from local history. This can't be undone.`}
+							{bulkHasCloud
+								? ` Cloud ${bulkCount === 1 ? "session" : "sessions"} also delete${bulkCount === 1 ? "s" : ""} the cloud workspace.`
+								: null}
+							{bulkHasWorktree
+								? ` ${bulkCount === 1 ? TASK_WORKTREE_DELETE_WARNING : BULK_TASK_WORKTREE_DELETE_WARNING}`
+								: null}
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={isBulkDeleting}>
+							Cancel
+						</AlertDialogCancel>
+						<AlertDialogAction
+							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+							disabled={isBulkDeleting}
+							onClick={(event) => {
+								event.preventDefault();
+								void confirmBulkDelete();
+							}}
+						>
+							{bulkProgress ? (
+								<>
+									<Loader2 className="size-4 animate-spin" />
+									{`Deleting ${bulkProgress.current} of ${bulkProgress.total}…`}
 								</>
 							) : (
 								"Delete"

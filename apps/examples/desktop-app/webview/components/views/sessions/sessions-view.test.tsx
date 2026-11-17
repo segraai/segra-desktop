@@ -13,6 +13,9 @@ import type { SessionHistoryItem } from "@/lib/session-history";
 import { TASK_WORKTREE_DELETE_WARNING } from "@/lib/work-in-selection";
 import { registerTaskWorktreeRoot } from "@/lib/workspace-paths";
 
+const toastMock = vi.hoisted(() => vi.fn());
+vi.mock("@/hooks/use-toast", () => ({ toast: toastMock }));
+
 let container: HTMLDivElement;
 let root: Root;
 
@@ -109,6 +112,7 @@ afterEach(async () => {
 	await act(async () => root.unmount());
 	container.remove();
 	vi.restoreAllMocks();
+	toastMock.mockClear();
 });
 
 describe("formatCompactTokens", () => {
@@ -452,6 +456,269 @@ describe("SessionsView pagination", () => {
 				'button[aria-label="First page"]',
 			)?.disabled,
 		).toBe(true);
+	});
+});
+
+describe("SessionsView bulk selection", () => {
+	const threads = Array.from({ length: 25 }, (_, index) => ({
+		...thread,
+		id: `session-${index}`,
+		title: `Session ${index}`,
+	}));
+
+	const rowCheckbox = (title: string) =>
+		Array.from(
+			container.querySelectorAll<HTMLButtonElement>('button[role="checkbox"]'),
+		).find((box) => box.getAttribute("aria-label") === `Select "${title}"`) ??
+		null;
+	const headerCheckbox = () =>
+		container.querySelector<HTMLButtonElement>(
+			'button[role="checkbox"][aria-label="Select all on this page"]',
+		);
+	const click = async (
+		element: Element | null | undefined,
+		init: MouseEventInit = {},
+	) => {
+		expect(element).toBeTruthy();
+		await act(async () => {
+			element?.dispatchEvent(
+				new MouseEvent("click", { bubbles: true, cancelable: true, ...init }),
+			);
+		});
+	};
+	const buttonByText = (text: string, scope: ParentNode = container) =>
+		Array.from(scope.querySelectorAll<HTMLButtonElement>("button")).find(
+			(button) => button.textContent?.trim() === text,
+		);
+	const selectedLabel = () =>
+		Array.from(container.querySelectorAll("span")).find((node) =>
+			node.textContent?.endsWith(" selected"),
+		)?.textContent;
+	const typeSearch = async (value: string) => {
+		const search = container.querySelector<HTMLInputElement>(
+			'input[aria-label="Search sessions"]',
+		);
+		await act(async () => {
+			const setValue = Object.getOwnPropertyDescriptor(
+				HTMLInputElement.prototype,
+				"value",
+			)?.set;
+			setValue?.call(search, value);
+			search?.dispatchEvent(new Event("input", { bubbles: true }));
+		});
+	};
+	const openBulkDialog = async () => {
+		await click(buttonByText("Delete"));
+		return document.body.querySelector('[role="alertdialog"]');
+	};
+
+	it("shows the selection bar with the count and clears it", async () => {
+		const view = renderView({ threads });
+		await view.render();
+		expect(selectedLabel()).toBeUndefined();
+
+		await click(rowCheckbox("Session 0"));
+		await click(rowCheckbox("Session 2"));
+		expect(selectedLabel()).toBe("2 selected");
+		expect(buttonByText("Delete")).toBeTruthy();
+
+		await click(buttonByText("Clear"));
+		expect(selectedLabel()).toBeUndefined();
+		expect(rowCheckbox("Session 0")?.getAttribute("aria-checked")).toBe(
+			"false",
+		);
+	});
+
+	it("does not open the session when a checkbox is clicked", async () => {
+		const view = renderView({ threads });
+		await view.render();
+		await click(rowCheckbox("Session 1"));
+		expect(view.openThread).not.toHaveBeenCalled();
+	});
+
+	it("selects and clears the whole page from the header and shows indeterminate", async () => {
+		const view = renderView({ threads });
+		await view.render();
+
+		await click(rowCheckbox("Session 3"));
+		expect(headerCheckbox()?.getAttribute("aria-checked")).toBe("mixed");
+
+		await click(headerCheckbox());
+		expect(selectedLabel()).toBe("10 selected");
+		expect(headerCheckbox()?.getAttribute("aria-checked")).toBe("true");
+
+		await click(headerCheckbox());
+		expect(selectedLabel()).toBeUndefined();
+		expect(headerCheckbox()?.getAttribute("aria-checked")).toBe("false");
+	});
+
+	it("selects a range on shift-click", async () => {
+		const view = renderView({ threads });
+		await view.render();
+
+		await click(rowCheckbox("Session 2"));
+		await click(rowCheckbox("Session 5"), { shiftKey: true });
+		expect(selectedLabel()).toBe("4 selected");
+		for (const title of ["Session 2", "Session 3", "Session 4", "Session 5"]) {
+			expect(rowCheckbox(title)?.getAttribute("aria-checked")).toBe("true");
+		}
+		expect(rowCheckbox("Session 6")?.getAttribute("aria-checked")).toBe(
+			"false",
+		);
+	});
+
+	it("clears the selection on page change and on search change", async () => {
+		const view = renderView({ threads });
+		await view.render();
+
+		await click(rowCheckbox("Session 0"));
+		await click(container.querySelector('button[aria-label="Next page"]'));
+		expect(selectedLabel()).toBeUndefined();
+		await click(container.querySelector('button[aria-label="First page"]'));
+		expect(rowCheckbox("Session 0")?.getAttribute("aria-checked")).toBe(
+			"false",
+		);
+
+		await click(rowCheckbox("Session 0"));
+		await typeSearch("Session 1");
+		expect(selectedLabel()).toBeUndefined();
+	});
+
+	it("clears the selection when a filter changes", async () => {
+		const view = renderView({ threads });
+		await view.render();
+		await click(rowCheckbox("Session 0"));
+
+		await act(async () => {
+			container
+				.querySelector('button[aria-label="Filter sessions"]')
+				?.dispatchEvent(
+					new MouseEvent("pointerdown", {
+						bubbles: true,
+						cancelable: true,
+						button: 0,
+					}),
+				);
+		});
+		const option = Array.from(
+			document.body.querySelectorAll<HTMLElement>('[role="menuitemcheckbox"]'),
+		)[0];
+		expect(option).toBeTruthy();
+		await act(async () => {
+			option.click();
+		});
+		expect(selectedLabel()).toBeUndefined();
+	});
+
+	it("uses singular and plural wording in the confirmation", async () => {
+		const view = renderView({ threads });
+		await view.render();
+
+		await click(rowCheckbox("Session 0"));
+		let dialog = await openBulkDialog();
+		expect(dialog?.textContent).toContain("Delete 1 session?");
+		expect(dialog?.textContent).toContain(
+			"This removes 1 session from local history. This can't be undone.",
+		);
+		await click(buttonByText("Cancel", document.body));
+
+		await click(rowCheckbox("Session 1"));
+		dialog = await openBulkDialog();
+		expect(dialog?.textContent).toContain("Delete 2 sessions?");
+		expect(dialog?.textContent).toContain(
+			"This removes 2 sessions from local history. This can't be undone.",
+		);
+		expect(view.history.deleteThread).not.toHaveBeenCalled();
+	});
+
+	it("keeps the cloud and worktree warnings for bulk delete", async () => {
+		registerTaskWorktreeRoot("/home/host/cline-dir/worktrees");
+		try {
+			const mixed = [
+				{ ...threads[0], origin: "cloud" as const },
+				{
+					...threads[1],
+					workspacePath: "/home/host/cline-dir/worktrees/ab12c/app",
+				},
+			];
+			const view = renderView({ threads: mixed });
+			await view.render();
+			await click(headerCheckbox());
+			const dialog = await openBulkDialog();
+			expect(dialog?.textContent).toContain("cloud workspace");
+			expect(dialog?.textContent).toContain("git worktrees");
+		} finally {
+			registerTaskWorktreeRoot("");
+		}
+	});
+
+	it("deletes every selected session in order and shows progress", async () => {
+		const view = renderView({ threads });
+		const resolvers: Array<(value: boolean) => void> = [];
+		view.history.deleteThread.mockImplementation(
+			() => new Promise<boolean>((resolve) => resolvers.push(resolve)),
+		);
+		await view.render();
+		await click(rowCheckbox("Session 4"));
+		await click(rowCheckbox("Session 1"));
+		await click(rowCheckbox("Session 7"));
+		await openBulkDialog();
+
+		await click(
+			Array.from(
+				document.body.querySelectorAll<HTMLButtonElement>(
+					'[role="alertdialog"] button',
+				),
+			).find((button) => button.textContent === "Delete"),
+		);
+		// Sequential: only the first call is in flight.
+		expect(view.history.deleteThread).toHaveBeenCalledTimes(1);
+		expect(document.body.textContent).toContain("Deleting 1 of 3");
+		expect(buttonByText("Clear")?.disabled).toBe(true);
+
+		for (let index = 0; index < 3; index += 1) {
+			await act(async () => resolvers[index]?.(true));
+		}
+		expect(view.history.deleteThread.mock.calls.map((call) => call[0])).toEqual(
+			["session-1", "session-4", "session-7"],
+		);
+		expect(document.body.querySelector('[role="alertdialog"]')).toBeNull();
+		expect(selectedLabel()).toBeUndefined();
+	});
+
+	it("keeps failed sessions selected after a partial failure", async () => {
+		const view = renderView({ threads });
+		view.history.deleteThread.mockImplementation(
+			async (id: string) => id !== "session-1",
+		);
+		await view.render();
+		await click(rowCheckbox("Session 0"));
+		await click(rowCheckbox("Session 1"));
+		await click(rowCheckbox("Session 2"));
+		await openBulkDialog();
+		await click(
+			Array.from(
+				document.body.querySelectorAll<HTMLButtonElement>(
+					'[role="alertdialog"] button',
+				),
+			).find((button) => button.textContent === "Delete"),
+		);
+
+		expect(view.history.deleteThread).toHaveBeenCalledTimes(3);
+		expect(document.body.querySelector('[role="alertdialog"]')).toBeNull();
+		// The mocked list is unchanged, so only the failed row stays ticked.
+		expect(selectedLabel()).toBe("1 selected");
+		expect(rowCheckbox("Session 1")?.getAttribute("aria-checked")).toBe("true");
+		expect(rowCheckbox("Session 0")?.getAttribute("aria-checked")).toBe(
+			"false",
+		);
+		expect(toastMock).toHaveBeenCalledWith(
+			expect.objectContaining({
+				variant: "destructive",
+				title: "Deleted 2 of 3 sessions",
+				description: "1 could not be deleted and is still selected.",
+			}),
+		);
 	});
 });
 
