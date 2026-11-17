@@ -1,5 +1,5 @@
 import { Switch } from "@cline/ui";
-import { Download, Minus, Plus, RotateCcw } from "lucide-react";
+import { Download, Info, Minus, Plus, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +9,11 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import {
 	DEFAULT_APP_FONT_SIZE,
@@ -88,11 +93,6 @@ export {
 	SETTINGS_SECTIONS,
 	type SettingsSection,
 } from "./sections";
-
-type GlobalSettingsResponse = {
-	telemetryOptOut: boolean;
-	autoUpdateEnabled: boolean;
-};
 
 const PROVIDER_CATALOG_CACHE_TTL_MS = 60_000;
 
@@ -683,9 +683,76 @@ const ACCENT_OPTIONS: { id: HubAccent; label: string; swatch: string }[] = [
 ];
 
 const APP_MODE_OPTIONS: { id: AppMode; label: string }[] = [
-	{ id: "accountant", label: "Accountant" },
+	{ id: "normal", label: "Normal" },
 	{ id: "developer", label: "Developer" },
 ];
+
+/** What normal mode changes compared with developer mode. */
+export const NORMAL_MODE_DIFFERENCES: readonly string[] = [
+	"Hides git branches, worktrees, pull requests and code diffs.",
+	"Runs on this computer only: no remote or cloud environments.",
+	'Says "folder" instead of workspace or project, and groups chats by folder.',
+	"Shows starting points on the welcome screen and document checks in Schedules.",
+	"Hides the Import, Remote and Marketplace settings, and the sidebar's source filter.",
+];
+
+/** Info icon that lists the differences. Opens on hover, focus or click. */
+function AppModeInfo() {
+	const [open, setOpen] = useState(false);
+	const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const cancelClose = () => {
+		if (closeTimer.current) clearTimeout(closeTimer.current);
+		closeTimer.current = null;
+	};
+	const show = () => {
+		cancelClose();
+		setOpen(true);
+	};
+	const hideSoon = () => {
+		cancelClose();
+		closeTimer.current = setTimeout(() => setOpen(false), 150);
+	};
+	useEffect(() => cancelClose, []);
+	return (
+		<Popover onOpenChange={setOpen} open={open}>
+			<PopoverTrigger asChild>
+				<button
+					aria-label="What normal mode changes"
+					className="inline-flex size-5 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					// A click always opens (hover may already have): skip Radix's toggle.
+					onClick={(event) => {
+						event.preventDefault();
+						show();
+					}}
+					onMouseEnter={show}
+					onMouseLeave={hideSoon}
+					type="button"
+				>
+					<Info className="size-4" />
+				</button>
+			</PopoverTrigger>
+			<PopoverContent
+				align="start"
+				className="w-80 text-sm"
+				onMouseEnter={show}
+				onMouseLeave={hideSoon}
+			>
+				<p className="mb-2 font-semibold text-foreground">
+					Normal mode, compared with Developer
+				</p>
+				<ul className="list-disc space-y-1 pl-4 text-muted-foreground">
+					{NORMAL_MODE_DIFFERENCES.map((line) => (
+						<li key={line}>{line}</li>
+					))}
+				</ul>
+				<p className="mt-2 text-muted-foreground">
+					The document tools (reading PDFs and scans, writing Excel files) work
+					in both modes.
+				</p>
+			</PopoverContent>
+		</Popover>
+	);
+}
 
 function GeneralSettingsContent({
 	onExportDiagnostics,
@@ -714,56 +781,9 @@ function GeneralSettingsContent({
 	>("desktop");
 	const [appIconError, setAppIconError] = useState<string | null>(null);
 	const appIconRequestRef = useRef(0);
-	const [telemetryOptOut, setTelemetryOptOut] = useState(false);
-	const [telemetryLoading, setTelemetryLoading] = useState(true);
-	const [telemetrySaving, setTelemetrySaving] = useState(false);
-	const [telemetryError, setTelemetryError] = useState<string | null>(null);
 
 	useEffect(() => setAppIconLocation(appIconSurface(navigator.userAgent)), []);
 	useEffect(() => subscribeToAppFontSize(setFontSize), []);
-
-	const loadGlobalSettings = useCallback(async () => {
-		setTelemetryLoading(true);
-		setTelemetryError(null);
-		try {
-			const settings = await desktopClient.invoke<GlobalSettingsResponse>(
-				"get_global_settings",
-			);
-			setTelemetryOptOut(settings.telemetryOptOut);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			setTelemetryError(message);
-		} finally {
-			setTelemetryLoading(false);
-		}
-	}, []);
-
-	useEffect(() => {
-		const timeoutId = window.setTimeout(() => {
-			void loadGlobalSettings();
-		}, 0);
-		return () => window.clearTimeout(timeoutId);
-	}, [loadGlobalSettings]);
-
-	const updateTelemetryOptOut = async (nextValue: boolean) => {
-		const previousValue = telemetryOptOut;
-		setTelemetryOptOut(nextValue);
-		setTelemetrySaving(true);
-		setTelemetryError(null);
-		try {
-			const settings = await desktopClient.invoke<GlobalSettingsResponse>(
-				"set_telemetry_opt_out",
-				{ telemetry_opt_out: nextValue },
-			);
-			setTelemetryOptOut(settings.telemetryOptOut);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			setTelemetryOptOut(previousValue);
-			setTelemetryError(message);
-		} finally {
-			setTelemetrySaving(false);
-		}
-	};
 
 	const updateTheme = (darkModeEnabled: boolean) => {
 		const nextTheme = darkModeEnabled ? "dark" : "light";
@@ -817,9 +837,12 @@ function GeneralSettingsContent({
 			<section className="max-w-344">
 				<div className="flex items-center justify-between gap-5 border-b py-4 max-[720px]:flex-col max-[720px]:items-stretch">
 					<div className="flex flex-col gap-1">
-						<p className="text-base font-semibold text-foreground">Mode</p>
+						<div className="flex items-center gap-1.5">
+							<p className="text-base font-semibold text-foreground">Mode</p>
+							<AppModeInfo />
+						</div>
 						<p className="text-sm text-muted-foreground">
-							Accountant mode hides the coding tools: git branches, pull
+							Normal mode hides the coding tools: git branches, pull
 							requests and code diffs.
 						</p>
 					</div>
@@ -974,25 +997,6 @@ function GeneralSettingsContent({
 							</button>
 						))}
 					</div>
-				</div>
-				<div className="flex py-4 items-center justify-between gap-5 border-b max-[720px]:flex-col max-[720px]:items-stretch max-[720px]:py-4">
-					<div className="flex flex-col gap-1">
-						<p className="text-base font-semibold text-foreground">Telemetry</p>
-						<p className="text-sm text-muted-foreground">
-							Enable error and usage reports to help improve Segra Desktop.
-						</p>
-						{telemetryError ? (
-							<p className="mt-2 text-xs text-destructive" role="alert">
-								Failed to update telemetry setting: {telemetryError}
-							</p>
-						) : null}
-					</div>
-					<Switch
-						aria-label="Telemetry"
-						checked={!telemetryOptOut}
-						disabled={telemetryLoading || telemetrySaving}
-						onCheckedChange={(checked) => void updateTelemetryOptOut(!checked)}
-					/>
 				</div>
 				<div className="flex py-4 items-center justify-between gap-5 border-b max-[720px]:flex-col max-[720px]:items-stretch max-[720px]:py-4">
 					<div className="flex flex-col gap-1">

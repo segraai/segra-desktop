@@ -9,6 +9,7 @@ import {
 import {
 	ArrowLeft,
 	ArrowRight,
+	ArrowUpRight,
 	Blocks,
 	ChevronDown,
 	CircleUserRound,
@@ -206,9 +207,24 @@ function SettingsSectionNavigation({
 	const mode = useAppMode();
 	const settingsSections = settingsSectionsForMode(mode);
 	const customizationSections = customizationSectionsForMode(mode);
+	// Normal mode has no Customize row at the top of the sidebar: its
+	// pages sit in this list, just above About.
+	const listedSections: readonly SettingsSection[] =
+		mode === "normal"
+			? [
+					...settingsSections.filter((section) => section !== "About"),
+					...customizationSections,
+					...settingsSections.filter((section) => section === "About"),
+				]
+			: settingsSections;
 	const renderSectionButton = (section: SettingsSection) => {
 		const Icon = SETTINGS_SECTION_ICONS[section];
-		const label = settingsSectionLabel(section);
+		// In normal mode Customize is an ordinary settings page, so it
+		// keeps its own name instead of the "Installed" sub-tab label.
+		const label =
+			mode === "normal" && section === "Customize"
+				? "Customize"
+				: settingsSectionLabel(section);
 		const disabled = section === "Voice" && hasConnectedProvider === false;
 		const button = (
 			<Button
@@ -279,11 +295,13 @@ function SettingsSectionNavigation({
 			    The collapsed sidebar has no action rows and keeps them
 			    reachable. */}
 			{open
-				? settingsSections
+				? listedSections
 						.filter((section) => collapsed || section !== "Schedules")
 						.map(renderSectionButton)
 				: null}
-			{collapsed && customizationSections.length > 0 ? (
+			{collapsed &&
+			mode !== "normal" &&
+			customizationSections.length > 0 ? (
 				<>
 					<div className="my-2 h-px w-6 shrink-0 bg-sidebar-border" />
 					{customizationSections.map(renderSectionButton)}
@@ -345,11 +363,11 @@ export function AgentSidebar({
 	const [sourceFilter, setSourceFilter] = useState(ALL_SESSION_SOURCES);
 	const mode = useAppMode();
 	const terms = useTerms();
-	// Not persisted. Until the user picks one, accountants group by folder and
+	// Not persisted. Until the user picks one, normal mode groups by folder and
 	// developers sort by time.
 	const [sortChoice, setSortChoice] = useState<SidebarSortMode | null>(null);
 	const sortMode: SidebarSortMode =
-		sortChoice ?? (mode === "accountant" ? "project" : "time");
+		sortChoice ?? (mode === "normal" ? "project" : "time");
 	// Segra: the bottom Settings list folds; remembered across launches.
 	// macOS draws its traffic lights over the title bar's left edge; elsewhere
 	// that space is free. Decided after mount so hydration matches.
@@ -703,7 +721,7 @@ export function AgentSidebar({
 						</DropdownMenuRadioItem>
 					))}
 				</DropdownMenuRadioGroup>
-				{sourceOptions.length > 0 && mode !== "accountant" ? (
+				{sourceOptions.length > 0 && mode !== "normal" ? (
 					<>
 						<DropdownMenuSeparator />
 						<DropdownMenuLabel>Source</DropdownMenuLabel>
@@ -751,6 +769,50 @@ export function AgentSidebar({
 			) : (
 				<Clock3 className="size-3.5" />
 			)}
+		</Button>
+	);
+	// Normal mode: the list has two views, so the header is a plain
+	// two-way switch. The full Sessions page opens from its own arrow button
+	// rather than from the header label (which reads "Folders" half the time).
+	const viewOptions = [
+		{ value: "project", label: `${terms.Project}s` },
+		{ value: "time", label: "Sessions" },
+	] as const;
+	const viewToggle = (
+		// biome-ignore lint/a11y/useSemanticElements: a fieldset adds legend/border styling this compact switch doesn't want
+		<div
+			aria-label="Sidebar view"
+			className="inline-flex min-w-0 items-center gap-0.5 rounded-md bg-surface-hover/60 p-0.5"
+			role="group"
+		>
+			{viewOptions.map((option) => (
+				<button
+					aria-pressed={sortMode === option.value}
+					className={cn(
+						"rounded px-2 py-0.5 text-xs font-medium transition-colors",
+						sortMode === option.value
+							? "bg-sidebar text-sidebar-foreground shadow-sm"
+							: "text-muted-foreground hover:text-sidebar-foreground",
+					)}
+					key={option.value}
+					onClick={() => setSortChoice(option.value)}
+					type="button"
+				>
+					{option.label}
+				</button>
+			))}
+		</div>
+	);
+	const openSessionsButton = (
+		<Button
+			aria-label="Open sessions page"
+			className="m-0! inline-flex size-8 items-center justify-center rounded-md p-0! text-muted-foreground hover:bg-surface-hover hover:text-sidebar-foreground"
+			onClick={openSessions}
+			size="icon"
+			title="Open sessions page"
+			variant="ghost"
+		>
+			<ArrowUpRight className="size-3.5" />
 		</Button>
 	);
 	const threadItem = (thread: Thread, options?: { nested?: boolean }) => (
@@ -954,7 +1016,7 @@ export function AgentSidebar({
 											)}
 										/>
 										<span className="font-medium">
-											{mode === "accountant"
+											{mode === "normal"
 												? hubStatus?.connected
 													? "Connected"
 													: "Not connected"
@@ -1031,22 +1093,26 @@ export function AgentSidebar({
 							<Clock3 className="size-4 shrink-0" />
 							<span className="truncate">Schedule</span>
 						</Button>
-						<Button
-							aria-label="Customize"
-							className={cn(
-								customizeSectionOpen &&
-									"bg-surface-hover-lighter text-sidebar-foreground",
-							)}
-							onClick={() => openSettingsSection("Customize")}
-							title="Customize Segra Desktop with plugins, rules, and more"
-							type="button"
-							variant="sidebarItem"
-						>
-							<Blocks className="size-4 shrink-0" />
-							<span className="truncate">Customize</span>
-						</Button>
+						{mode !== "normal" ? (
+							<Button
+								aria-label="Customize"
+								className={cn(
+									customizeSectionOpen &&
+										"bg-surface-hover-lighter text-sidebar-foreground",
+								)}
+								onClick={() => openSettingsSection("Customize")}
+								title="Customize Segra Desktop with plugins, rules, and more"
+								type="button"
+								variant="sidebarItem"
+							>
+								<Blocks className="size-4 shrink-0" />
+								<span className="truncate">Customize</span>
+							</Button>
+						) : null}
 						{/* A lone "Installed" row under Customize would only repeat it. */}
-						{customizeSectionOpen && customizationSections.length > 1
+						{mode !== "normal" &&
+						customizeSectionOpen &&
+						customizationSections.length > 1
 							? customizationSections.map((section) => (
 									<Button
 										aria-current={
@@ -1112,20 +1178,29 @@ export function AgentSidebar({
 					<>
 						<div className="mt-5 shrink-0 pl-4 pr-2">
 							<div className="flex h-8 items-center justify-between gap-2">
-								<button
-									className={cn(
-										"min-w-0 truncate text-sm font-medium text-muted-foreground",
-										view === "sessions" && "text-sidebar-foreground",
-									)}
-									onClick={openSessions}
-									type="button"
-								>
-									{sortMode === "time" ? "Sessions" : `${terms.Project}s`}
-								</button>
-								<div className="flex shrink-0 items-center gap-0.5">
-									{sortToggle}
-									{filterMenu}
-								</div>
+								{mode === "normal" ? (
+									<>
+										{viewToggle}
+										{sortMode === "time" ? openSessionsButton : null}
+									</>
+								) : (
+									<>
+										<button
+											className={cn(
+												"min-w-0 truncate text-sm font-medium text-muted-foreground",
+												view === "sessions" && "text-sidebar-foreground",
+											)}
+											onClick={openSessions}
+											type="button"
+										>
+											{sortMode === "time" ? "Sessions" : `${terms.Project}s`}
+										</button>
+										<div className="flex shrink-0 items-center gap-0.5">
+											{sortToggle}
+											{filterMenu}
+										</div>
+									</>
+								)}
 							</div>
 						</div>
 
@@ -1354,7 +1429,7 @@ export function AgentSidebar({
 							{deleteConfirmThread?.origin === "cloud"
 								? `This deletes "${normalizeTitle(deleteConfirmThread?.title ?? "this session")}" and its cloud workspace.`
 								: `This removes "${normalizeTitle(deleteConfirmThread?.title ?? "this session")}" from local history.`}
-							{mode !== "accountant" &&
+							{mode !== "normal" &&
 							deleteConfirmThread?.origin !== "cloud" &&
 							isTaskWorktreePath(deleteConfirmThread?.workspacePath ?? "")
 								? ` ${TASK_WORKTREE_DELETE_WARNING}`
@@ -1584,8 +1659,8 @@ function ThreadItem({
 	const terms = useTerms();
 	const infoItems = getSessionOverviewItems(thread, {
 		workspaceLabel: terms.Workspace,
-		showGit: mode !== "accountant",
-		showSource: mode !== "accountant",
+		showGit: mode !== "normal",
+		showSource: mode !== "normal",
 	});
 
 	if (editing) {

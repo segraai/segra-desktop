@@ -1,4 +1,4 @@
-export type AccountantStarter = {
+export type WelcomeStarter = {
 	id: string;
 	title: string;
 	description: string;
@@ -6,11 +6,11 @@ export type AccountantStarter = {
 };
 
 /**
- * Starting points shown on the welcome screen in accountant mode. Each prompt
- * is placed in the message box for the accountant to edit before sending, and
+ * Starting points shown on the welcome screen in normal mode. Each prompt
+ * is placed in the message box for the user to edit before sending, and
  * steers the model to the `read_document` and `write_workbook` tools.
  */
-export const ACCOUNTANT_STARTERS: readonly AccountantStarter[] = [
+export const WELCOME_STARTERS: readonly WelcomeStarter[] = [
 	{
 		id: "extract-client-documents",
 		title: "Extract client documents",

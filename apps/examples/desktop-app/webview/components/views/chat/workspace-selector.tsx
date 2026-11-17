@@ -17,7 +17,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useIsAccountantMode } from "@/lib/app-mode";
+import { useIsNormalMode } from "@/lib/app-mode";
 import { useTerms } from "@/lib/app-terms";
 import { scrollCurrentOptionIntoView } from "@/lib/scroll-current-option";
 import { cn } from "@/lib/utils";
@@ -64,7 +64,7 @@ export function WorkspaceSelector({
 	disabled?: boolean;
 }) {
 	const terms = useTerms();
-	const accountantMode = useIsAccountantMode();
+	const normalMode = useIsNormalMode();
 	const [open, setOpen] = useState(false);
 	const [search, setSearch] = useState("");
 	const [branches, setBranches] = useState<string[]>([]);
@@ -106,7 +106,7 @@ export function WorkspaceSelector({
 	// affordance; a plain folder shows only folder language. Pending branch
 	// discovery (null) is presented like a plain folder until it resolves.
 	const hasGit =
-		!accountantMode && currentBranch !== null && currentBranch !== "no-git";
+		!normalMode && currentBranch !== null && currentBranch !== "no-git";
 
 	const openMenu = async () => {
 		if (disabled) {
@@ -122,7 +122,7 @@ export function WorkspaceSelector({
 		setLoadingBranches(true);
 		try {
 			const [branchPayload] = await Promise.all([
-				accountantMode ? null : onListGitBranches(),
+				normalMode ? null : onListGitBranches(),
 				onRefreshWorkspaces(),
 			]);
 			if (branchPayload) setBranches(branchPayload.branches);

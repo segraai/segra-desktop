@@ -22,7 +22,7 @@ class ResizeObserverStub {
 	unobserve() {}
 }
 
-async function renderPage(mode: "accountant" | "developer") {
+async function renderPage(mode: "normal" | "developer") {
 	window.localStorage.setItem(APP_MODE_STORAGE_KEY, mode);
 	await act(async () => {
 		root.render(<RoutineSchedulesContent />);
@@ -60,8 +60,8 @@ afterEach(async () => {
 });
 
 describe("RoutineSchedulesContent suggestions", () => {
-	it("shows the accountant cards in accountant mode", async () => {
-		await renderPage("accountant");
+	it("shows the normal mode cards in normal mode", async () => {
+		await renderPage("normal");
 		const text = container.textContent ?? "";
 		expect(text).toContain("Check for new documents");
 		expect(text).toContain("Watch for CRA notices");

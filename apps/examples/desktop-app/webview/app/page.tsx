@@ -66,7 +66,7 @@ import { useSessionHistory } from "@/hooks/use-session-history";
 import { toast } from "@/hooks/use-toast";
 import { applyAppZoomAction, syncAppFontSize } from "@/lib/app-font-size";
 import { syncAppIcon } from "@/lib/app-icon";
-import { useIsAccountantMode } from "@/lib/app-mode";
+import { useIsNormalMode } from "@/lib/app-mode";
 import type { ChatSessionConfig } from "@/lib/chat-schema";
 import { openPersonalGitHubInstallUrl } from "@/lib/cline-integrations";
 import { cloudRepositoryLabel } from "@/lib/cloud-repositories";
@@ -305,8 +305,8 @@ function toThreadTitle(options: { title?: string; prompt?: string }): string {
 }
 
 export default function Home() {
-	// Accountants work locally only: no remote (SSH) or cloud environments.
-	const accountant = useIsAccountantMode();
+	// Normal mode works locally only: no remote (SSH) or cloud environments.
+	const normalMode = useIsNormalMode();
 	const [initialThreadId] = useState(makeThreadId);
 	// Outlive keyed chat panes without re-rendering the app on every keystroke.
 	const { current: promptDrafts } = useRef(new Map<string, string>());
@@ -413,8 +413,8 @@ export default function Home() {
 		void syncDesktopWindowTitle();
 	}, []);
 
-	const accountantRef = useRef(accountant);
-	accountantRef.current = accountant;
+	const normalModeRef = useRef(normalMode);
+	normalModeRef.current = normalMode;
 
 	useEffect(() => {
 		let cancelled = false;
@@ -426,7 +426,7 @@ export default function Home() {
 					const remoteEnvironment =
 						remoteWorkspaceEnvironmentFromContext(context);
 					setActiveRemoteEnvironment(remoteEnvironment);
-					if (remoteEnvironment && !accountantRef.current) {
+					if (remoteEnvironment && !normalModeRef.current) {
 						dispatchApp({
 							type: "select-environment-draft",
 							threadId: makeThreadId(),
@@ -444,8 +444,8 @@ export default function Home() {
 	}, []);
 
 	useEffect(() => {
-		// Accountants never see remote environments, so skip listing them.
-		if (view !== "chat" || accountant) return;
+		// Normal mode never shows remote environments, so skip listing them.
+		if (view !== "chat" || normalMode) return;
 		let revision = 0;
 		const refresh = () => {
 			const requestRevision = ++revision;
@@ -473,7 +473,7 @@ export default function Home() {
 			++revision;
 			unsubscribe();
 		};
-	}, [view, accountant]);
+	}, [view, normalMode]);
 
 	useEffect(
 		() => () => {
@@ -585,15 +585,15 @@ export default function Home() {
 		],
 	);
 	// A remote environment left active from developer mode (or restored by the
-	// backend at startup) must not stay silently active for an accountant:
+	// backend at startup) must not stay silently active in normal mode:
 	// switch back to this computer through the normal local-selection path,
 	// which also disconnects the remote runtime.
 	useEffect(() => {
-		if (!accountant || !activeRemoteEnvironment) return;
+		if (!normalMode || !activeRemoteEnvironment) return;
 		void handleSelectEnvironment(LOCAL_WORKSPACE_ENVIRONMENT_ID).catch(() => {
 			// handleSelectEnvironment already reported the failure.
 		});
-	}, [accountant, activeRemoteEnvironment, handleSelectEnvironment]);
+	}, [normalMode, activeRemoteEnvironment, handleSelectEnvironment]);
 	const pickRemoteWorkspaceDirectory = useCallback(
 		(environment: RemoteWorkspaceEnvironment): Promise<string | null> => {
 			remoteDirectoryPickerResolverRef.current?.(null);
@@ -1242,7 +1242,7 @@ function ChatThreadPane({
 		handlePromptInputChange,
 	} = usePromptDraft(promptDrafts, threadId);
 	const [pendingAttachments, setPendingAttachments] = usePendingAttachments();
-	const accountant = useIsAccountantMode();
+	const normalMode = useIsNormalMode();
 	const [workInSelection, setWorkInSelection] =
 		useState<WorkIn>(readWorkInFromWindow);
 	const setWorkIn = useCallback((next: WorkIn) => {
@@ -1265,7 +1265,7 @@ function ChatThreadPane({
 		boolean | null
 	>(null);
 	const cloudAgentsEnabled =
-		!accountant &&
+		!normalMode &&
 		cloudAgentsFlagEnabled === true &&
 		environmentId === LOCAL_WORKSPACE_ENVIRONMENT_ID;
 	const { user: accountUser, activeOrganization } = useAccount();
@@ -1317,10 +1317,10 @@ function ChatThreadPane({
 	// for the local environment. The choice also only holds while the
 	// workspace is a git repo; a plain folder (or pending discovery) silently
 	// falls back to running locally.
-	// Accountants never work in a worktree; a stored "worktree" choice stays
-	// in storage untouched but is ignored while in accountant mode.
+	// Normal mode never works in a worktree; a stored "worktree" choice stays
+	// in storage untouched but is ignored while in normal mode.
 	const canWorkInWorktree =
-		!accountant &&
+		!normalMode &&
 		environmentId === LOCAL_WORKSPACE_ENVIRONMENT_ID &&
 		config.executionTarget !== "cloud" &&
 		historySession?.origin !== "cloud";
@@ -1812,8 +1812,8 @@ function ChatThreadPane({
 	}, [activeWorkspaceCwd, environmentId]);
 
 	useEffect(() => {
-		// Git is developer-only: accountants skip all background branch polling.
-		if (accountant) return;
+		// Git is developer-only: normal mode skips all background branch polling.
+		if (normalMode) return;
 		void refreshGitBranch();
 		if (!activeWorkspaceCwd) {
 			return;
@@ -1837,7 +1837,7 @@ function ChatThreadPane({
 			window.removeEventListener("focus", refreshVisibleBranch);
 			document.removeEventListener("visibilitychange", refreshVisibleBranch);
 		};
-	}, [accountant, activeWorkspaceCwd, environmentId, refreshGitBranch]);
+	}, [normalMode, activeWorkspaceCwd, environmentId, refreshGitBranch]);
 
 	useEffect(() => {
 		setDismissedHistorySessionId(null);
@@ -2252,7 +2252,7 @@ function ChatThreadPane({
 	// Reset only new composers when the flag turns off; existing sessions attach.
 	useEffect(() => {
 		if (
-			(cloudAgentsFlagEnabled !== null || accountant) &&
+			(cloudAgentsFlagEnabled !== null || normalMode) &&
 			!cloudAgentsEnabled &&
 			config.executionTarget === "cloud" &&
 			!historySession &&
@@ -2261,7 +2261,7 @@ function ChatThreadPane({
 			handleExecutionTargetChange("local");
 		}
 	}, [
-		accountant,
+		normalMode,
 		cloudAgentsEnabled,
 		cloudAgentsFlagEnabled,
 		config.executionTarget,
@@ -2412,10 +2412,10 @@ function ChatThreadPane({
 		[summary.additions, summary.deletions],
 	);
 	const handleOpenDiff = useCallback(() => {
-		if (!accountant && summary.additions + summary.deletions > 0) {
+		if (!normalMode && summary.additions + summary.deletions > 0) {
 			setShowDiffView(true);
 		}
-	}, [accountant, summary.additions, summary.deletions]);
+	}, [normalMode, summary.additions, summary.deletions]);
 
 	const activeSessionForTitle = hideDeletedSessionUi
 		? null
@@ -2531,10 +2531,10 @@ function ChatThreadPane({
 	);
 
 	useEffect(() => {
-		if (!hasDiffChanges || accountant) {
+		if (!hasDiffChanges || normalMode) {
 			setShowDiffView(false);
 		}
-	}, [hasDiffChanges, accountant]);
+	}, [hasDiffChanges, normalMode]);
 
 	const resolvedWorkspaceRoot = config.workspaceRoot || config.cwd || "";
 	const workspaceContextValue = useMemo(
@@ -2582,7 +2582,7 @@ function ChatThreadPane({
 	}
 
 	// "no-git" is the existing "plain folder" value: it hides branch UI.
-	const visibleGitBranch = accountant ? "no-git" : gitBranch;
+	const visibleGitBranch = normalMode ? "no-git" : gitBranch;
 	const composer = (
 		<ChatInputBar
 			readOnly={isCloudSessionExpired}
@@ -2660,7 +2660,7 @@ function ChatThreadPane({
 								canEditTitle={Boolean(activeSessionForTitle)}
 								canDeleteSession={Boolean(activeSessionToDelete)}
 								deletingSession={deletingSession}
-								diff={isCloudSession || accountant ? undefined : headerDiff}
+								diff={isCloudSession || normalMode ? undefined : headerDiff}
 								onDeleteSession={requestDeleteSession}
 								onNewThread={onNewThread}
 								onOpenDiff={handleOpenDiff}
@@ -2674,14 +2674,14 @@ function ChatThreadPane({
 				) : null}
 				<WelcomeScreen
 					active={isWelcomeState}
-					onSelectAccountantStarter={setPromptInput}
+					onSelectStarter={setPromptInput}
 					body={
 						isCloudSession &&
 						displayedIsSwitching &&
 						displayedMessages.length === 0 ? (
 							// Keep opening an existing cloud session visually continuous.
 							<CloudProvisioningPane phase="Opening session..." />
-						) : showDiffView && !isCloudSession && !accountant ? (
+						) : showDiffView && !isCloudSession && !normalMode ? (
 							<DiffView
 								cwd={config.cwd || config.workspaceRoot}
 								environmentId={environmentId}
@@ -2735,7 +2735,7 @@ function ChatThreadPane({
 					}
 					composer={composer}
 					environmentSelector={
-						accountant ? null : (
+						normalMode ? null : (
 							<EnvironmentSelector
 								activeEnvironmentId={environmentId}
 								cloudEnabled={cloudAgentsEnabled}
@@ -2780,7 +2780,7 @@ function ChatThreadPane({
 					onRepoUrlChange={handleCloudRepoUrlChange}
 					onCloudBranchChange={handleCloudBranchChange}
 					cloudAgentsEnabled={
-						!accountant &&
+						!normalMode &&
 						(cloudAgentsEnabled ||
 							(cloudAgentsFlagEnabled === null &&
 								config.executionTarget === "cloud"))

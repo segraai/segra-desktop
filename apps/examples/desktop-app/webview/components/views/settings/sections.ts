@@ -52,7 +52,7 @@ export const CUSTOMIZATION_SECTIONS = ALL_CUSTOMIZATION_SECTIONS.filter(
 	(section) => !HIDDEN_SECTIONS.has(section),
 );
 
-const ACCOUNTANT_HIDDEN_SECTIONS: ReadonlySet<SettingsSection> = new Set([
+const NORMAL_MODE_HIDDEN_SECTIONS: ReadonlySet<SettingsSection> = new Set([
 	"Import",
 	"Remote",
 	"Marketplace",
@@ -62,7 +62,7 @@ export function isSectionAvailableInMode(
 	section: SettingsSection,
 	mode: AppMode,
 ): boolean {
-	return mode !== "accountant" || !ACCOUNTANT_HIDDEN_SECTIONS.has(section);
+	return mode !== "normal" || !NORMAL_MODE_HIDDEN_SECTIONS.has(section);
 }
 
 export function settingsSectionsForMode(

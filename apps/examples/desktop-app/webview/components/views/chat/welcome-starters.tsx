@@ -8,9 +8,9 @@ import {
 	Mail,
 } from "lucide-react";
 import {
-	ACCOUNTANT_STARTERS,
-	type AccountantStarter,
-} from "@/lib/accountant-starters";
+	WELCOME_STARTERS,
+	type WelcomeStarter,
+} from "@/lib/welcome-starters";
 
 const STARTER_ICONS: Record<string, LucideIcon> = {
 	"extract-client-documents": FileSpreadsheet,
@@ -20,20 +20,20 @@ const STARTER_ICONS: Record<string, LucideIcon> = {
 };
 
 /**
- * Four starting points for accountant mode. Selecting one only hands its
+ * Four starting points for normal mode. Selecting one only hands its
  * prompt to `onSelect`; it never sends a message.
  */
-export function AccountantStarters({
+export function WelcomeStarters({
 	onSelect,
 	className,
 }: {
-	onSelect: (prompt: string, starter: AccountantStarter) => void;
+	onSelect: (prompt: string, starter: WelcomeStarter) => void;
 	className?: string;
 }) {
 	return (
 		<section aria-label="Starting points" className={className}>
 			<ul className="grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2">
-				{ACCOUNTANT_STARTERS.map((starter) => {
+				{WELCOME_STARTERS.map((starter) => {
 					const Icon = STARTER_ICONS[starter.id] ?? FileText;
 					return (
 						<li className="min-w-0" key={starter.id}>

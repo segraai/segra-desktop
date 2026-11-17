@@ -726,9 +726,9 @@ describe("WelcomeScreen", () => {
 	});
 });
 
-describe("WelcomeScreen accountant mode", () => {
+describe("WelcomeScreen normal mode", () => {
 	beforeEach(() => {
-		window.localStorage.setItem("segra.app-mode.v1", "accountant");
+		window.localStorage.setItem("segra.app-mode.v1", "normal");
 	});
 
 	function cardButtons() {
@@ -737,7 +737,7 @@ describe("WelcomeScreen accountant mode", () => {
 		];
 	}
 
-	it("uses the accountant heading and shows four starting points", async () => {
+	it("uses the normal mode heading and shows four starting points", async () => {
 		await renderWelcomeScreen({
 			workspaceRoot: "/clients/acme",
 			workspaces: [],
@@ -759,16 +759,16 @@ describe("WelcomeScreen accountant mode", () => {
 	});
 
 	it("hands the prompt to the callback when a card is clicked, without sending", async () => {
-		const onSelectAccountantStarter = vi.fn();
+		const onSelectStarter = vi.fn();
 		invokeMock.mockClear();
 		await renderWelcomeScreen({
 			workspaceRoot: "/clients/acme",
 			workspaces: [],
-			onSelectAccountantStarter,
+			onSelectStarter,
 		});
 		await clickButton("Read a CRA notice");
-		expect(onSelectAccountantStarter).toHaveBeenCalledOnce();
-		expect(onSelectAccountantStarter.mock.calls[0]?.[0]).toContain(
+		expect(onSelectStarter).toHaveBeenCalledOnce();
+		expect(onSelectStarter.mock.calls[0]?.[0]).toContain(
 			"read_document",
 		);
 		expect(

@@ -22,9 +22,9 @@ const DEVELOPER_TERMS: AppTerms = {
 	searchWorkspacesPlaceholder: "Search workspaces, or type a folder path",
 };
 
-// Accountants organize their own folders (by client, by year, by engagement),
+// People organize their own folders (by client, by year, by engagement),
 // so the wording says "folder" and doesn't assume one folder per client.
-const ACCOUNTANT_TERMS: AppTerms = {
+const NORMAL_TERMS: AppTerms = {
 	workspace: "folder",
 	Workspace: "Folder",
 	workspaces: "folders",
@@ -36,7 +36,7 @@ const ACCOUNTANT_TERMS: AppTerms = {
 };
 
 export function termsForMode(mode: AppMode): AppTerms {
-	return mode === "accountant" ? ACCOUNTANT_TERMS : DEVELOPER_TERMS;
+	return mode === "normal" ? NORMAL_TERMS : DEVELOPER_TERMS;
 }
 
 export function useTerms(): AppTerms {

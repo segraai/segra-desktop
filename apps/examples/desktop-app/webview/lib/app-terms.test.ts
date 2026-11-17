@@ -15,8 +15,8 @@ describe("termsForMode", () => {
 		});
 	});
 
-	it("uses folder wording for accountants", () => {
-		expect(termsForMode("accountant")).toEqual({
+	it("uses folder wording in normal mode", () => {
+		expect(termsForMode("normal")).toEqual({
 			workspace: "folder",
 			Workspace: "Folder",
 			workspaces: "folders",

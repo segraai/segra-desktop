@@ -8,14 +8,14 @@ import {
 } from "./sections";
 
 describe("settings sections by mode", () => {
-	it("hides Import and Remote for accountants", () => {
-		const sections = settingsSectionsForMode("accountant");
+	it("hides Import and Remote in normal mode", () => {
+		const sections = settingsSectionsForMode("normal");
 		expect(sections).not.toContain("Import");
 		expect(sections).not.toContain("Remote");
 		expect(sections).toEqual(
 			SETTINGS_SECTIONS.filter((s) => s !== "Import" && s !== "Remote"),
 		);
-		expect(customizationSectionsForMode("accountant")).toEqual(
+		expect(customizationSectionsForMode("normal")).toEqual(
 			CUSTOMIZATION_SECTIONS.filter((s) => s !== "Marketplace"),
 		);
 	});
@@ -28,10 +28,10 @@ describe("settings sections by mode", () => {
 	});
 
 	it("reports availability per mode", () => {
-		expect(isSectionAvailableInMode("Import", "accountant")).toBe(false);
-		expect(isSectionAvailableInMode("Remote", "accountant")).toBe(false);
-		expect(isSectionAvailableInMode("Marketplace", "accountant")).toBe(false);
-		expect(isSectionAvailableInMode("General", "accountant")).toBe(true);
+		expect(isSectionAvailableInMode("Import", "normal")).toBe(false);
+		expect(isSectionAvailableInMode("Remote", "normal")).toBe(false);
+		expect(isSectionAvailableInMode("Marketplace", "normal")).toBe(false);
+		expect(isSectionAvailableInMode("General", "normal")).toBe(true);
 		expect(isSectionAvailableInMode("Import", "developer")).toBe(true);
 		expect(isSectionAvailableInMode("Marketplace", "developer")).toBe(true);
 	});

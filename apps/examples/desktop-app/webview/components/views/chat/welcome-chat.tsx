@@ -16,7 +16,7 @@ import { useAccount } from "@/contexts/account-context";
 import { useWorkspace } from "@/contexts/workspace-context";
 import { isAgendaTaskExpired, useAgendaTasks } from "@/hooks/use-agenda-tasks";
 import { useClineSignIn } from "@/hooks/use-cline-sign-in";
-import { useIsAccountantMode } from "@/lib/app-mode";
+import { useIsNormalMode } from "@/lib/app-mode";
 import { useTerms } from "@/lib/app-terms";
 import { openPersonalGitHubInstallUrl } from "@/lib/cline-integrations";
 import {
@@ -33,11 +33,11 @@ import { desktopClient } from "@/lib/desktop-client";
 import { AGENDA_UI_ENABLED } from "@/lib/feature-flags";
 import { invalidateProviderCatalogCache } from "@/lib/provider-model-catalog";
 import type { WorkIn } from "@/lib/work-in-selection";
-import { AccountantStarters } from "./accountant-starters";
 import {
 	CloudOnboardingCard,
 	type CloudOnboardingVariant,
 } from "./cloud-onboarding";
+import { WelcomeStarters } from "./welcome-starters";
 import { WelcomeWorkspaceControls } from "./welcome-workspace-controls";
 
 // Used only until the API's connectUrl arrives (or when it is blank), so a
@@ -82,7 +82,7 @@ export function WelcomeScreen({
 	workIn,
 	onWorkInChange,
 	onOpenSession,
-	onSelectAccountantStarter,
+	onSelectStarter,
 }: {
 	active: boolean;
 	body: ReactNode;
@@ -104,16 +104,16 @@ export function WelcomeScreen({
 	onWorkInChange?: (next: WorkIn) => void;
 	onOpenSession?: (sessionId: string) => void | Promise<void>;
 	/**
-	 * Accountant mode: called with a starter's prompt when its card is clicked.
+	 * Normal mode: called with a starter's prompt when its card is clicked.
 	 * The parent should put the text in the composer without sending it.
 	 */
-	onSelectAccountantStarter?: (prompt: string) => void;
+	onSelectStarter?: (prompt: string) => void;
 }) {
-	const accountantMode = useIsAccountantMode();
+	const normalMode = useIsNormalMode();
 	const terms = useTerms();
-	// Accountant mode is local-only whatever the props say.
-	const executionTarget = accountantMode ? "local" : executionTargetProp;
-	const cloudAgentsEnabled = accountantMode ? false : cloudAgentsEnabledProp;
+	// Normal mode is local-only whatever the props say.
+	const executionTarget = normalMode ? "local" : executionTargetProp;
+	const cloudAgentsEnabled = normalMode ? false : cloudAgentsEnabledProp;
 	const { user, activeOrganization, refreshAccount } = useAccount();
 	const cloudScope = user
 		? JSON.stringify([
@@ -536,10 +536,10 @@ export function WelcomeScreen({
 			}
 			welcomeFooter={
 				<>
-					{active && accountantMode ? (
-						<AccountantStarters
+					{active && normalMode ? (
+						<WelcomeStarters
 							className="cline-view-enter mt-6"
-							onSelect={(prompt) => onSelectAccountantStarter?.(prompt)}
+							onSelect={(prompt) => onSelectStarter?.(prompt)}
 						/>
 					) : null}
 					{active && AGENDA_UI_ENABLED ? (

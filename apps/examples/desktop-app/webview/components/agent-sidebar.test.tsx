@@ -151,7 +151,7 @@ beforeEach(() => {
 		});
 	}
 	window.localStorage.clear();
-	// Existing tests describe developer mode; accountant mode has its own suite.
+	// Existing tests describe developer mode; normal mode has its own suite.
 	window.localStorage.setItem("segra.app-mode.v1", "developer");
 	invoke.mockReset();
 	invoke.mockRejectedValue(new Error("No Cline account auth token found"));
@@ -1403,11 +1403,15 @@ describe("AgentSidebar session organization", () => {
 	});
 });
 
-describe("AgentSidebar accountant mode", () => {
+describe("AgentSidebar normal mode", () => {
 	const renderSidebar = async (
-		mode: "accountant" | "developer",
+		mode: "normal" | "developer",
 		threads: SessionThread[] = [],
-		props: { view?: "chat" | "settings"; section?: "Customize" } = {},
+		props: {
+			view?: "chat" | "settings";
+			section?: "Customize";
+			setView?: (view: string) => void;
+		} = {},
 	) => {
 		window.localStorage.setItem("segra.app-mode.v1", mode);
 		window.localStorage.setItem("segra.sidebar.settings-open", "1");
@@ -1419,7 +1423,7 @@ describe("AgentSidebar accountant mode", () => {
 						onHome={vi.fn()}
 						onSettingsSectionChange={vi.fn()}
 						sessionHistory={makeSessionHistory(threads, vi.fn())}
-						setView={vi.fn()}
+						setView={props.setView ?? vi.fn()}
 						settingsSection={props.section ?? "General"}
 						view={props.view ?? "chat"}
 					/>
@@ -1431,7 +1435,7 @@ describe("AgentSidebar accountant mode", () => {
 		container.querySelector(`[aria-label="${name}"]`);
 
 	it("leaves Import, Remote and Marketplace out of the settings list", async () => {
-		await renderSidebar("accountant");
+		await renderSidebar("normal");
 		await vi.waitFor(() => expect(label("General")).not.toBeNull());
 		for (const name of ["Import", "Remote", "Marketplace"]) {
 			expect(label(name)).toBeNull();
@@ -1445,40 +1449,78 @@ describe("AgentSidebar accountant mode", () => {
 		expect(label("Remote")).not.toBeNull();
 	});
 
-	it("drops Marketplace and the lone Installed sub-row under Customize", async () => {
-		await renderSidebar("accountant", [], {
+	it("moves Customize from the top rows into the settings list", async () => {
+		await renderSidebar("normal", [], {
 			view: "settings",
 			section: "Customize",
 		});
 		const actions = container.querySelector(
 			'[aria-label="Sidebar actions"]',
 		) as Element;
+		expect(actions.querySelector('[aria-label="Customize"]')).toBeNull();
 		expect(actions.querySelector('[aria-label="Marketplace"]')).toBeNull();
 		expect(actions.querySelector('[aria-label="Installed"]')).toBeNull();
+		const settings = container.querySelector(
+			'[aria-label="Settings sections"]',
+		) as Element;
+		const names = [...settings.querySelectorAll("button[aria-label]")].map(
+			(button) => button.getAttribute("aria-label"),
+		);
+		expect(names).toContain("Customize");
+		expect(names).not.toContain("Marketplace");
+		// It sits just above About, as the current page.
+		expect(names.indexOf("Customize")).toBe(names.indexOf("About") - 1);
+		expect(
+			settings
+				.querySelector('[aria-label="Customize"]')
+				?.getAttribute("aria-current"),
+		).toBe("page");
 		await renderSidebar("developer", [], {
 			view: "settings",
 			section: "Customize",
 		});
+		expect(actions.querySelector('[aria-label="Customize"]')).not.toBeNull();
 		expect(actions.querySelector('[aria-label="Marketplace"]')).not.toBeNull();
 		expect(actions.querySelector('[aria-label="Installed"]')).not.toBeNull();
 	});
 
-	it("groups by folder by default and says Folder in the sort toggle", async () => {
-		await renderSidebar("accountant", [makeThread("acme", 1)]);
-		expect(label("Sort sessions: Folder")).not.toBeNull();
-		expect(label("Sort sessions: Time")).toBeNull();
+	it("groups by folder by default and switches views with the Folders / Sessions toggle", async () => {
+		await renderSidebar("normal", [makeThread("acme", 1)]);
+		const pressed = (text: string) =>
+			buttonWithText(text).getAttribute("aria-pressed");
+		expect(pressed("Folders")).toBe("true");
+		expect(pressed("Sessions")).toBe("false");
 		expect(
 			container.querySelector('button[aria-expanded][title="acme"]'),
 		).not.toBeNull();
-		expect(container.textContent).toContain("Folders");
-		expect(label("Sort sessions: Folder")?.getAttribute("title")).toContain(
-			"Grouped by folder",
-		);
-		await click(label("Sort sessions: Folder") as Element);
-		await vi.waitFor(() => expect(label("Sort sessions: Time")).not.toBeNull());
-		expect(label("Sort sessions: Time")?.getAttribute("title")).toContain(
-			"group by folder",
-		);
+		// No status filter or sort icon in normal mode, and the arrow to
+		// the Sessions page only shows in the Sessions view.
+		expect(label("Filter sessions")).toBeNull();
+		expect(label("Sort sessions: Folder")).toBeNull();
+		expect(label("Open sessions page")).toBeNull();
+
+		await click(buttonWithText("Sessions"));
+		await vi.waitFor(() => expect(pressed("Sessions")).toBe("true"));
+		expect(pressed("Folders")).toBe("false");
+		expect(
+			container.querySelector('button[aria-expanded][title="acme"]'),
+		).toBeNull();
+		expect(label("Open sessions page")).not.toBeNull();
+
+		await click(buttonWithText("Folders"));
+		await vi.waitFor(() => expect(pressed("Folders")).toBe("true"));
+	});
+
+	it("opens the Sessions page from the arrow, not from the Folders label", async () => {
+		const setView = vi.fn();
+		await renderSidebar("normal", [makeThread("acme", 1)], { setView });
+		await click(buttonWithText("Folders"));
+		expect(setView).not.toHaveBeenCalled();
+		await click(buttonWithText("Sessions"));
+		await vi.waitFor(() => expect(label("Open sessions page")).not.toBeNull());
+		expect(setView).not.toHaveBeenCalled();
+		await click(label("Open sessions page") as Element);
+		expect(setView).toHaveBeenCalledWith("sessions");
 	});
 
 	it("keeps time as the default and says Project in developer mode", async () => {

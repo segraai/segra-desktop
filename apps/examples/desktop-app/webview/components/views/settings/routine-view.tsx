@@ -506,7 +506,7 @@ export function RoutineSchedulesContent({
 }) {
 	const appMode = useAppMode();
 	const terms = useTerms();
-	const isAccountant = appMode === "accountant";
+	const isNormalMode = appMode === "normal";
 	const [schedules, setSchedules] = useState<RoutineSchedule[]>(
 		() => routineOverviewCache?.schedules ?? [],
 	);
@@ -1181,7 +1181,7 @@ export function RoutineSchedulesContent({
 		<PageFrame>
 			<PageHeader
 				description={
-					isAccountant
+					isNormalMode
 						? "Run the assistant on a schedule for recurring checks like new documents and weekly summaries."
 						: "Run agents on cron schedules for recurring automations like daily summaries and code reviews."
 				}
@@ -1686,7 +1686,7 @@ export function RoutineSchedulesContent({
 									}))
 								}
 								placeholder={
-									isAccountant ? "Daily document check" : "Daily code review"
+									isNormalMode ? "Daily document check" : "Daily code review"
 								}
 							/>
 						</div>

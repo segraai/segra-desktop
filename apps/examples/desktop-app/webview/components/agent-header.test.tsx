@@ -10,7 +10,7 @@ let root: Root;
 
 beforeEach(() => {
 	Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-	// Developer behaviour by default; accountant mode is tested separately.
+	// Developer behaviour by default; normal mode is tested separately.
 	window.localStorage.setItem("segra.app-mode.v1", "developer");
 	container = document.createElement("div");
 	document.body.appendChild(container);
@@ -516,7 +516,7 @@ describe("AgentHeader subagent session badge", () => {
 	});
 });
 
-describe("AgentHeader accountant mode", () => {
+describe("AgentHeader normal mode", () => {
 	it("shows the diff button in developer mode", async () => {
 		await act(async () => {
 			root.render(
@@ -530,8 +530,8 @@ describe("AgentHeader accountant mode", () => {
 		expect(container.querySelector("#diff-stats")).not.toBeNull();
 	});
 
-	it("has no diff entry point in accountant mode", async () => {
-		window.localStorage.setItem("segra.app-mode.v1", "accountant");
+	it("has no diff entry point in normal mode", async () => {
+		window.localStorage.setItem("segra.app-mode.v1", "normal");
 		await act(async () => {
 			root.render(
 				<AgentHeader

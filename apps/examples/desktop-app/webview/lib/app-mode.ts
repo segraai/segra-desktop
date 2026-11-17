@@ -1,13 +1,13 @@
 import { useSyncExternalStore } from "react";
 
-export type AppMode = "accountant" | "developer";
+export type AppMode = "normal" | "developer";
 
-export const DEFAULT_APP_MODE: AppMode = "accountant";
+export const DEFAULT_APP_MODE: AppMode = "normal";
 export const APP_MODE_STORAGE_KEY = "segra.app-mode.v1";
 export const APP_MODE_CHANGE_EVENT = "segra-app-mode-change";
 
 export function isAppMode(value: unknown): value is AppMode {
-	return value === "accountant" || value === "developer";
+	return value === "normal" || value === "developer";
 }
 
 export function readStoredAppMode(): AppMode {
@@ -15,6 +15,8 @@ export function readStoredAppMode(): AppMode {
 		return DEFAULT_APP_MODE;
 	}
 	try {
+		// Older builds stored "accountant" for what is now "normal"; anything
+		// unrecognised falls back to the default, which is normal mode.
 		const stored = window.localStorage.getItem(APP_MODE_STORAGE_KEY);
 		return isAppMode(stored) ? stored : DEFAULT_APP_MODE;
 	} catch {
@@ -54,6 +56,6 @@ export function useAppMode(): AppMode {
 	);
 }
 
-export function useIsAccountantMode(): boolean {
-	return useAppMode() === "accountant";
+export function useIsNormalMode(): boolean {
+	return useAppMode() === "normal";
 }

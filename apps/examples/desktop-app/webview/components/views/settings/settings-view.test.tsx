@@ -8,7 +8,7 @@ import {
 	applyAppZoomAction,
 } from "@/lib/app-font-size";
 import { APP_MODE_STORAGE_KEY, readStoredAppMode } from "@/lib/app-mode";
-import { SettingsView } from "./settings-view";
+import { NORMAL_MODE_DIFFERENCES, SettingsView } from "./settings-view";
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@/lib/desktop-client", () => ({
@@ -42,7 +42,6 @@ beforeEach(() => {
 	delete document.documentElement.dataset.clineFontSize;
 	invoke.mockReset();
 	invoke.mockResolvedValue({
-		telemetryOptOut: false,
 		autoUpdateEnabled: true,
 	});
 	container = document.createElement("div");
@@ -131,12 +130,12 @@ describe("SettingsView mode", () => {
 			(b) => b.textContent === label,
 		);
 
-	it("renders the Mode control with accountant selected by default", async () => {
+	it("renders the Mode control with normal mode selected by default", async () => {
 		await renderGeneral();
 		expect(container.textContent).toContain(
-			"Accountant mode hides the coding tools: git branches, pull requests and code diffs.",
+			"Normal mode hides the coding tools: git branches, pull requests and code diffs.",
 		);
-		expect(modeButton("Accountant")?.getAttribute("aria-pressed")).toBe("true");
+		expect(modeButton("Normal")?.getAttribute("aria-pressed")).toBe("true");
 		expect(modeButton("Developer")?.getAttribute("aria-pressed")).toBe("false");
 	});
 
@@ -148,12 +147,40 @@ describe("SettingsView mode", () => {
 		expect(window.localStorage.getItem(APP_MODE_STORAGE_KEY)).toBe("developer");
 		expect(readStoredAppMode()).toBe("developer");
 		expect(modeButton("Developer")?.getAttribute("aria-pressed")).toBe("true");
-		expect(modeButton("Accountant")?.getAttribute("aria-pressed")).toBe(
+		expect(modeButton("Normal")?.getAttribute("aria-pressed")).toBe(
 			"false",
 		);
 	});
 
-	it("shows General when asked for a section hidden in accountant mode", async () => {
+	it("lists what normal mode changes when the info icon is clicked", async () => {
+		await renderGeneral();
+		const info = container.querySelector<HTMLButtonElement>(
+			'button[aria-label="What normal mode changes"]',
+		);
+		expect(info).not.toBeNull();
+		await act(async () => {
+			info?.click();
+		});
+		const text = document.body.textContent ?? "";
+		expect(text).toContain("Normal mode, compared with Developer");
+		for (const line of NORMAL_MODE_DIFFERENCES) {
+			expect(text).toContain(line);
+		}
+		// A second click keeps it open rather than toggling it shut.
+		await act(async () => {
+			info?.click();
+		});
+		expect(document.body.textContent).toContain(NORMAL_MODE_DIFFERENCES[0]);
+	});
+
+	it("treats a mode stored by older builds as normal mode", async () => {
+		window.localStorage.setItem(APP_MODE_STORAGE_KEY, "accountant");
+		expect(readStoredAppMode()).toBe("normal");
+		await renderGeneral();
+		expect(modeButton("Normal")?.getAttribute("aria-pressed")).toBe("true");
+	});
+
+	it("shows General when asked for a section hidden in normal mode", async () => {
 		await renderGeneral("Import");
 		expect(container.textContent).toContain("Font size");
 	});

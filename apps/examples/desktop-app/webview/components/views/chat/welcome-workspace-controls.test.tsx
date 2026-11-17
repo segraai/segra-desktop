@@ -857,9 +857,9 @@ describe("WelcomeWorkspaceControls worktree toggle", () => {
 	});
 });
 
-describe("WelcomeWorkspaceControls accountant mode", () => {
+describe("WelcomeWorkspaceControls normal mode", () => {
 	beforeEach(() => {
-		window.localStorage.setItem("segra.app-mode.v1", "accountant");
+		window.localStorage.setItem("segra.app-mode.v1", "normal");
 	});
 
 	it("stays local-only even when cloud, git and worktree props are set", () => {

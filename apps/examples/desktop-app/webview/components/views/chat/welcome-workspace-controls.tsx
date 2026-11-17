@@ -31,7 +31,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useIsAccountantMode } from "@/lib/app-mode";
+import { useIsNormalMode } from "@/lib/app-mode";
 import { useTerms } from "@/lib/app-terms";
 import {
 	type CloudBranchListOptions,
@@ -586,7 +586,7 @@ function WorkspacePicker({
 	const [selectingChat, setSelectingChat] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const terms = useTerms();
-	const accountantMode = useIsAccountantMode();
+	const normalMode = useIsNormalMode();
 	const isChatWorkspace =
 		!workspaceRoot.trim() || isChatWorkspacePath(workspaceRoot);
 
@@ -685,7 +685,7 @@ function WorkspacePicker({
 	};
 
 	const workspaceLabel = isChatWorkspace
-		? accountantMode
+		? normalMode
 			? "Choose folder"
 			: "Chat"
 		: workspaceName(workspaceRoot);
@@ -1037,10 +1037,10 @@ export function WelcomeWorkspaceControls({
 	>(null);
 	const [cloudRepositoryId, setCloudRepositoryId] = useState<number>();
 	const [cloudDefaultBranch, setCloudDefaultBranch] = useState("");
-	// Accountant mode is local-only: no cloud, branch or worktree controls.
-	const accountantMode = useIsAccountantMode();
+	// Normal mode is local-only: no cloud, branch or worktree controls.
+	const normalMode = useIsNormalMode();
 	const showCloud =
-		!accountantMode && cloudEnabled && executionTarget === "cloud";
+		!normalMode && cloudEnabled && executionTarget === "cloud";
 	const isChatWorkspace =
 		!workspaceRoot.trim() || isChatWorkspacePath(workspaceRoot);
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -1063,7 +1063,7 @@ export function WelcomeWorkspaceControls({
 	}, [repoUrl]);
 	useEffect(() => {
 		if (
-			accountantMode ||
+			normalMode ||
 			executionTarget !== "cloud" ||
 			!signedIn ||
 			!repoUrl.trim() ||
@@ -1081,7 +1081,7 @@ export function WelcomeWorkspaceControls({
 			cancelled = true;
 		};
 	}, [
-		accountantMode,
+		normalMode,
 		cloudRepositoryId,
 		executionTarget,
 		handleCloudRepositoriesLoaded,
@@ -1176,7 +1176,7 @@ export function WelcomeWorkspaceControls({
 						workspaceRoot={workspaceRoot}
 						workspaces={workspaces}
 					/>
-					{!accountantMode &&
+					{!normalMode &&
 					!isChatWorkspace &&
 					currentBranch !== null &&
 					currentBranch !== "no-git" ? (

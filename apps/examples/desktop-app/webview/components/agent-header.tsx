@@ -14,7 +14,7 @@ import {
 	Trash2,
 } from "lucide-react";
 import { type CSSProperties, memo, useEffect, useMemo, useState } from "react";
-import { useIsAccountantMode } from "@/lib/app-mode";
+import { useIsNormalMode } from "@/lib/app-mode";
 import type { ChatSessionStatus } from "@/lib/chat-schema";
 import {
 	agentEntryState,
@@ -88,8 +88,8 @@ function AgentHeaderImpl({
 	const [isEditingTitle, setIsEditingTitle] = useState(false);
 	const [titleInput, setTitleInput] = useState("");
 	const [titleEditorWidth, setTitleEditorWidth] = useState<number>();
-	// Diffs are a developer view: accountants get no entry point to them.
-	const accountant = useIsAccountantMode();
+	// Diffs are a developer view: normal mode has no entry point to them.
+	const normalMode = useIsNormalMode();
 	const additions = diff?.additions ?? 0;
 	const deletions = diff?.deletions ?? 0;
 	const hasChanges = additions + deletions > 0;
@@ -139,7 +139,7 @@ function AgentHeaderImpl({
 							onOpenAgentSession={onOpenAgentSession}
 							onOpenChange={onAgentsOpenChange}
 						/>
-						{!accountant && additions !== 0 && (
+						{!normalMode && additions !== 0 && (
 							<Button
 								aria-label={`Open diff: ${additions} additions, ${deletions} deletions`}
 								className={cn(

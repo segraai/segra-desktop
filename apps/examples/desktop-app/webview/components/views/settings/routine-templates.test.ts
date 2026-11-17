@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-	ACCOUNTANT_ROUTINE_TEMPLATES,
+	DOCUMENT_ROUTINE_TEMPLATES,
 	defaultRoutinePromptForMode,
 	ROUTINE_TEMPLATES,
 	routineTemplatesForMode,
@@ -22,11 +22,11 @@ describe("routineTemplatesForMode", () => {
 		expect(ROUTINE_TEMPLATES).toHaveLength(4);
 	});
 
-	it("returns the accountant templates in accountant mode", () => {
-		expect(routineTemplatesForMode("accountant")).toBe(
-			ACCOUNTANT_ROUTINE_TEMPLATES,
+	it("returns the document templates in normal mode", () => {
+		expect(routineTemplatesForMode("normal")).toBe(
+			DOCUMENT_ROUTINE_TEMPLATES,
 		);
-		expect(ACCOUNTANT_ROUTINE_TEMPLATES.map((t) => t.title)).toEqual([
+		expect(DOCUMENT_ROUTINE_TEMPLATES.map((t) => t.title)).toEqual([
 			"Check for new documents",
 			"List missing documents",
 			"Watch for CRA notices",
@@ -35,17 +35,17 @@ describe("routineTemplatesForMode", () => {
 	});
 });
 
-describe("accountant templates", () => {
+describe("normal mode templates", () => {
 	it("have unique non-empty ids and names", () => {
 		for (const key of ["id", "name"] as const) {
-			const values = ACCOUNTANT_ROUTINE_TEMPLATES.map((t) => t[key]);
+			const values = DOCUMENT_ROUTINE_TEMPLATES.map((t) => t[key]);
 			expect(values.every((v) => v.trim().length > 0)).toBe(true);
 			expect(new Set(values).size).toBe(values.length);
 		}
 	});
 
 	it("have a valid schedule", () => {
-		for (const t of ACCOUNTANT_ROUTINE_TEMPLATES) {
+		for (const t of DOCUMENT_ROUTINE_TEMPLATES) {
 			expect(["daily", "weekly"]).toContain(t.scheduleType);
 			expect(t.scheduleDays.length).toBeGreaterThan(0);
 			for (const day of t.scheduleDays) {
@@ -62,7 +62,7 @@ describe("accountant templates", () => {
 	});
 
 	it("have prompts that use read_document and avoid developer words", () => {
-		for (const t of ACCOUNTANT_ROUTINE_TEMPLATES) {
+		for (const t of DOCUMENT_ROUTINE_TEMPLATES) {
 			expect(t.prompt).toContain("read_document");
 			for (const word of DEVELOPER_WORDS) {
 				expect(t.prompt).not.toMatch(
@@ -80,8 +80,8 @@ describe("defaultRoutinePromptForMode", () => {
 		);
 	});
 
-	it("uses a document prompt for accountants", () => {
-		expect(defaultRoutinePromptForMode("accountant")).toBe(
+	it("uses a document prompt in normal mode", () => {
+		expect(defaultRoutinePromptForMode("normal")).toBe(
 			"List the documents added to this folder since yesterday, with the type of each.",
 		);
 	});

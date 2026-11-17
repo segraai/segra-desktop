@@ -101,16 +101,16 @@ describe("ChatInputBar developer-only chrome", () => {
 		).not.toBeNull();
 	});
 
-	it("does not render the pull request bar in accountant mode", async () => {
-		window.localStorage.setItem("segra.app-mode.v1", "accountant");
+	it("does not render the pull request bar in normal mode", async () => {
+		window.localStorage.setItem("segra.app-mode.v1", "normal");
 		await renderBar();
 		expect(
 			container.querySelector('[data-testid="pull-request-bar"]'),
 		).toBeNull();
 	});
 
-	it("drops the #PR hint from the welcome placeholder in accountant mode", async () => {
-		window.localStorage.setItem("segra.app-mode.v1", "accountant");
+	it("drops the #PR hint from the welcome placeholder in normal mode", async () => {
+		window.localStorage.setItem("segra.app-mode.v1", "normal");
 		await renderBar("welcome");
 		const textarea = container.querySelector("textarea");
 		expect(textarea?.getAttribute("placeholder")).not.toMatch(/PR/);

@@ -11,7 +11,7 @@ import {
 	readStoredAppMode,
 	setStoredAppMode,
 	useAppMode,
-	useIsAccountantMode,
+	useIsNormalMode,
 } from "./app-mode";
 
 afterEach(() => {
@@ -20,13 +20,13 @@ afterEach(() => {
 });
 
 describe("app mode storage", () => {
-	it("defaults to accountant when missing or invalid", () => {
-		expect(DEFAULT_APP_MODE).toBe("accountant");
-		expect(readStoredAppMode()).toBe("accountant");
+	it("defaults to normal mode when missing or invalid", () => {
+		expect(DEFAULT_APP_MODE).toBe("normal");
+		expect(readStoredAppMode()).toBe("normal");
 		window.localStorage.setItem(APP_MODE_STORAGE_KEY, "pirate");
-		expect(readStoredAppMode()).toBe("accountant");
+		expect(readStoredAppMode()).toBe("normal");
 		expect(isAppMode("developer")).toBe(true);
-		expect(isAppMode("accountant")).toBe(true);
+		expect(isAppMode("normal")).toBe(true);
 		expect(isAppMode("x")).toBe(false);
 		expect(isAppMode(undefined)).toBe(false);
 	});
@@ -48,7 +48,7 @@ describe("app mode storage", () => {
 		vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
 			throw new Error("blocked");
 		});
-		expect(readStoredAppMode()).toBe("accountant");
+		expect(readStoredAppMode()).toBe("normal");
 		const listener = vi.fn();
 		window.addEventListener(APP_MODE_CHANGE_EVENT, listener);
 		expect(() => setStoredAppMode("developer")).not.toThrow();
@@ -64,20 +64,20 @@ describe("useAppMode", () => {
 		const root = createRoot(container);
 		function Probe() {
 			const mode = useAppMode();
-			const isAccountant = useIsAccountantMode();
-			return createElement("span", null, `${mode}:${isAccountant}`);
+			const isNormalMode = useIsNormalMode();
+			return createElement("span", null, `${mode}:${isNormalMode}`);
 		}
 		await act(async () => root.render(createElement(Probe)));
-		expect(container.textContent).toBe("accountant:true");
+		expect(container.textContent).toBe("normal:true");
 
 		await act(async () => setStoredAppMode("developer"));
 		expect(container.textContent).toBe("developer:false");
 
 		await act(async () => {
-			window.localStorage.setItem(APP_MODE_STORAGE_KEY, "accountant");
+			window.localStorage.setItem(APP_MODE_STORAGE_KEY, "normal");
 			window.dispatchEvent(new StorageEvent("storage"));
 		});
-		expect(container.textContent).toBe("accountant:true");
+		expect(container.textContent).toBe("normal:true");
 		await act(async () => root.unmount());
 	});
 });
