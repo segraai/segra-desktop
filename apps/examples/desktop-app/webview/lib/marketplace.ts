@@ -27,6 +27,8 @@ export type MarketplaceEntry = {
 	type: MarketplacePrimitiveType;
 	name: string;
 	featured?: boolean;
+	/** Shown in the "Segra Recommended" section; ships with the app. */
+	segraRecommended?: boolean;
 	tagline: string;
 	description: string;
 	tags: string[];
@@ -210,6 +212,8 @@ export async function fetchMarketplaceCatalog(): Promise<MarketplaceCatalog> {
 							typeof candidate.featured === "boolean"
 								? candidate.featured
 								: undefined,
+						segraRecommended:
+							candidate.segraRecommended === true ? true : undefined,
 						tagline: candidate.tagline,
 						description: candidate.description,
 						tags: toStringArray(candidate.tags),

@@ -48,7 +48,8 @@
 			"icons/app/macos/*.png",
 			"bin/remote-helpers/*",
 			"bin/desktop-backend/**/*",
-			"bin/llama/*"
+			"bin/llama/*",
+			"bin/segra-plugins/**/*"
 		],
 		"icon": [
 			"icons/32x32.png",

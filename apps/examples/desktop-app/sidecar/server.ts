@@ -10,7 +10,7 @@ import {
 	sendEvent,
 	syncSidecarApprovalReadiness,
 } from "./context";
-import { fetchMarketplaceCatalog } from "./marketplace";
+import { fetchMarketplaceCatalogWithSegra } from "./marketplace";
 import { cancelMcpOAuthAuthorizationsForOwner } from "./mcp-oauth";
 import { cancelProviderOAuthLoginsForOwner } from "./oauth-login";
 import {
@@ -249,7 +249,10 @@ export function createFetchHandler(
 
 		if (url.pathname === "/api/marketplace/catalog") {
 			try {
-				return createJsonResponse(req, await fetchMarketplaceCatalog());
+				return createJsonResponse(
+					req,
+					await fetchMarketplaceCatalogWithSegra(),
+				);
 			} catch (error) {
 				captureDesktopError(ctx, "marketplace.catalog", error);
 				return createJsonResponse(req, {

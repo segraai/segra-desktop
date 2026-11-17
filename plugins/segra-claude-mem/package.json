@@ -1,0 +1,28 @@
+{
+	"name": "segra-claude-mem",
+	"version": "0.0.1",
+	"private": true,
+	"description": "Connects Segra to claude-mem: records sessions, adds past work at the start of each run, and exposes claude-mem's search tools.",
+	"type": "module",
+	"cline": {
+		"plugins": [
+			{
+				"paths": [
+					"./index.ts"
+				],
+				"capabilities": [
+					"hooks",
+					"mcp"
+				]
+			}
+		]
+	},
+	"peerDependencies": {
+		"@cline/core": "*"
+	},
+	"peerDependenciesMeta": {
+		"@cline/core": {
+			"optional": true
+		}
+	}
+}

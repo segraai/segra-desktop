@@ -567,7 +567,13 @@ fn spawn_desktop_backend_process(context: &AppContext) -> Result<Child, String> 
                 context.resource_dir.join("bin").join("remote-helpers"),
             )
             // llama.cpp's server for local models (sidecar/local-models.ts).
-            .env("SEGRA_LLAMA_DIR", context.resource_dir.join("bin").join("llama"));
+            .env("SEGRA_LLAMA_DIR", context.resource_dir.join("bin").join("llama"))
+            // Plugins bundled for the Marketplace's "Segra Recommended"
+            // section (sidecar/segra-recommended.ts).
+            .env(
+                "SEGRA_PLUGINS_DIR",
+                context.resource_dir.join("bin").join("segra-plugins"),
+            );
         command
     } else {
         return Err(format!(

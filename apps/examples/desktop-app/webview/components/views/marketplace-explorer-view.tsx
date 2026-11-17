@@ -8,6 +8,7 @@ import {
 	Search,
 	Server,
 	ShieldAlert,
+	Sparkles,
 	Trash2,
 	User,
 	X,
@@ -335,6 +336,22 @@ function SectionHeader({
 			{beta ? <Badge>Beta</Badge> : null}
 			<span className="ml-1 min-w-0 flex-1 truncate text-xs text-muted-foreground/80">
 				{meta.blurb}
+			</span>
+		</h2>
+	);
+}
+
+function RecommendedSectionHeader() {
+	return (
+		<h2 className="flex min-w-0 items-center gap-2 px-2.5 pb-1.5 pt-1">
+			<span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+				<Sparkles aria-hidden="true" className="size-3.5" />
+			</span>
+			<span className="shrink-0 text-sm font-semibold text-foreground">
+				Segra Recommended
+			</span>
+			<span className="ml-1 min-w-0 flex-1 truncate text-xs text-muted-foreground/80">
+				Picked by Segra and included with the app.
 			</span>
 		</h2>
 	);
@@ -687,12 +704,19 @@ export function MarketplaceExplorerView({
 		[typeAndQueryEntries, selectedTag],
 	);
 
+	// Segra's picks get their own section at the top and are left out of the
+	// per-type groups below, so each entry is listed once.
+	const recommendedEntries = useMemo(
+		() => filteredEntries.filter((entry) => entry.segraRecommended),
+		[filteredEntries],
+	);
+
 	const groups = useMemo(
 		() =>
 			MATURITY_ORDER.map((type) => ({
 				type,
 				entries: filteredEntries
-					.filter((entry) => entry.type === type)
+					.filter((entry) => entry.type === type && !entry.segraRecommended)
 					.sort(
 						(a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured)),
 					),
@@ -851,6 +875,30 @@ export function MarketplaceExplorerView({
 								{directory.errorMessage}
 							</p>
 						) : null}
+						{recommendedEntries.length > 0 ? (
+							<section aria-label="Segra Recommended" className="grid gap-0.5">
+								<RecommendedSectionHeader />
+								{recommendedEntries.map((entry) => {
+									const key = entryKey(entry);
+									return (
+										<MarketplaceListRow
+											name={entry.name}
+											description={entry.tagline}
+											meta={TYPE_META[entry.type]}
+											showType
+											verified={entry.verified}
+											installed={directory.installedKeys.has(key)}
+											key={key}
+											onSelect={() => setSelectedKey(key)}
+											selected={
+												selectedEntry !== null &&
+												entryKey(selectedEntry) === key
+											}
+										/>
+									);
+								})}
+							</section>
+						) : null}
 						{groups.map((group) => {
 							const meta = TYPE_META[group.type];
 							return (
@@ -879,6 +927,7 @@ export function MarketplaceExplorerView({
 							);
 						})}
 						{groups.length === 0 &&
+						recommendedEntries.length === 0 &&
 						!showConnectors &&
 						!directory.loading &&
 						!directory.errorMessage ? (

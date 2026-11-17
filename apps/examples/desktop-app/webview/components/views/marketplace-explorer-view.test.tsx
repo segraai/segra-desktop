@@ -97,6 +97,47 @@ function connectorFilter() {
 }
 
 describe("Marketplace directory", () => {
+	it("lists Segra's picks in their own section above the type groups", async () => {
+		mocks.configured = false;
+		const install = { args: ["x"], command: "" };
+		mocks.marketplace.mockResolvedValue({
+			tags: [],
+			entries: [
+				{
+					id: "segra-claude-mem",
+					type: "plugin",
+					name: "claude-mem memory",
+					segraRecommended: true,
+					tagline: "Shared memory for Segra and Claude Code.",
+					description: "",
+					tags: [],
+					install,
+				},
+				{
+					id: "goal",
+					type: "plugin",
+					name: "Goal",
+					tagline: "Set goals",
+					description: "",
+					tags: [],
+					install,
+				},
+			],
+		});
+		await render();
+		const recommended = container.querySelector(
+			'section[aria-label="Segra Recommended"]',
+		);
+		expect(recommended?.textContent).toContain("Segra Recommended");
+		expect(recommended?.textContent).toContain("claude-mem memory");
+		expect(recommended?.textContent).not.toContain("Goal");
+		const text = container.textContent ?? "";
+		// Listed once, and before the regular plugin rows.
+		expect(text.split("claude-mem memory").length - 1).toBe(1);
+		expect(text.indexOf("claude-mem memory")).toBeLessThan(
+			text.indexOf("Goal"),
+		);
+	});
 	it("hides connectors and does not fetch their catalog without beta access", async () => {
 		mocks.configured = false;
 		await render();

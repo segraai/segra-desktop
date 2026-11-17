@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { installPlugin, SKILLS_CLI_PACKAGE } from "@cline/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+	fetchMarketplaceCatalogWithSegra,
 	getOfficialPluginInstallPath,
 	installMarketplaceEntry,
 	listMarketplaceInstalledEntries,
@@ -252,5 +253,38 @@ describe("skill install failures", () => {
 		).rejects.toThrow(
 			"Skill install failed with exit code 1:\nNetwork request failed",
 		);
+	});
+});
+
+describe("Segra recommended plugins", () => {
+	it("installs a recommended plugin from its bundled folder, replacing an older install", async () => {
+		const result = await installMarketplaceEntry({
+			entry: {
+				id: "segra-claude-mem",
+				type: "plugin",
+				name: "claude-mem memory",
+				install: { args: ["segra-claude-mem"] },
+			},
+		});
+
+		expect(result).toMatchObject({
+			status: "installed",
+			message: "Installed claude-mem memory.",
+		});
+		expect(installPluginMock).toHaveBeenCalledWith({
+			source: expect.stringMatching(/[\\/]plugins[\\/]segra-claude-mem$/),
+			force: true,
+		});
+	});
+
+	it("lists recommended entries even when the upstream catalog fails", async () => {
+		const catalog = (await fetchMarketplaceCatalogWithSegra(async () => {
+			throw new Error("offline");
+		})) as { entries: Array<{ id: string }>; error?: string };
+
+		expect(catalog.entries.map((entry) => entry.id)).toContain(
+			"segra-claude-mem",
+		);
+		expect(catalog.error).toBe("offline");
 	});
 });

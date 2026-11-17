@@ -34,6 +34,11 @@ import {
 	resolveClineDir,
 } from "@cline/shared/storage";
 import { deleteMcpServer, readMcpServersResponse } from "./mcp";
+import {
+	isSegraRecommendedEntry,
+	resolveSegraPluginDir,
+	withSegraRecommended,
+} from "./segra-recommended";
 import type { JsonRecord } from "./types";
 
 type MarketplacePrimitiveType = "mcp" | "skill" | "plugin";
@@ -102,6 +107,27 @@ const SECRET_BEARER_VALUE_PATTERN =
 	/((?:^|[^\w])authorization\s*[:=]\s*)bearer\s+([^\s,"'}\]]+)/gi;
 const SECRET_AUTHORIZATION_VALUE_PATTERN =
 	/((?:^|[^\w])authorization\s*[:=])(?!\s*bearer\b)\s*(.+)$/gi;
+
+/**
+ * The upstream catalog plus Segra's recommended entries. If the upstream
+ * catalog can't be fetched, the recommended entries are still returned, with
+ * the fetch error in `error`.
+ */
+export async function fetchMarketplaceCatalogWithSegra(
+	fetchImpl: CatalogFetch = fetch,
+): Promise<unknown> {
+	try {
+		return withSegraRecommended(await fetchMarketplaceCatalog(fetchImpl));
+	} catch (error) {
+		return {
+			...withSegraRecommended(undefined),
+			error:
+				error instanceof Error
+					? error.message
+					: "Failed to fetch marketplace catalog",
+		};
+	}
+}
 
 export async function fetchMarketplaceCatalog(
 	fetchImpl: CatalogFetch = fetch,
@@ -827,6 +853,9 @@ async function installPlugin(
 			"Plugin marketplace installs currently support exactly one source argument.",
 		);
 	}
+	if (isSegraRecommendedEntry(entry)) {
+		return installSegraBundledPlugin(entry);
+	}
 	const installState = getOfficialPluginInstallState(entry);
 	if (installState === "installed") {
 		return {
@@ -864,6 +893,39 @@ async function installPlugin(
 			installPath: result.installPath,
 			entryPaths: result.entryPaths,
 			mcpSyncFailures: result.mcpSyncFailures,
+		} as JsonRecord,
+		output: [`Path: ${result.installPath}`, ...warnings].join("\n"),
+	};
+}
+
+/**
+ * Installs a plugin that ships inside the app. `force` replaces an earlier
+ * install, so reinstalling after an app update picks up the bundled version.
+ */
+async function installSegraBundledPlugin(
+	entry: MarketplaceInstallInput,
+): Promise<MarketplaceInstallResult> {
+	const [name] = entry.install.args ?? [];
+	const source = name ? resolveSegraPluginDir(name) : undefined;
+	if (!source) {
+		throw new Error(
+			`${entry.name ?? entry.id} is not bundled with this build of Segra Desktop.`,
+		);
+	}
+	const result = await installCorePlugin({ source, force: true });
+	const warnings = result.mcpSyncFailures.map(
+		(failure) =>
+			`Failed to sync plugin MCP servers for ${failure.pluginName ?? failure.pluginPath}: ${failure.message}`,
+	);
+	return {
+		id: entry.id,
+		type: entry.type,
+		status: "installed",
+		message: `Installed ${entry.name ?? entry.id}.`,
+		details: {
+			source: result.source,
+			installPath: result.installPath,
+			entryPaths: result.entryPaths,
 		} as JsonRecord,
 		output: [`Path: ${result.installPath}`, ...warnings].join("\n"),
 	};
@@ -931,7 +993,9 @@ export async function installMarketplaceEntryFromCatalog(
 	} = {},
 ): Promise<MarketplaceInstallResult> {
 	const requested = readInstallRequest(args);
-	const catalog = await (options.loadCatalog ?? fetchMarketplaceCatalog)();
+	const catalog = await (
+		options.loadCatalog ?? fetchMarketplaceCatalogWithSegra
+	)();
 	const entry = readCatalogEntries(catalog).find(
 		(candidate) =>
 			candidate.id === requested.id && candidate.type === requested.type,
@@ -955,7 +1019,9 @@ export async function uninstallMarketplaceEntryFromCatalog(
 	} = {},
 ): Promise<MarketplaceInstallResult> {
 	const requested = readInstallRequest(args);
-	const catalog = await (options.loadCatalog ?? fetchMarketplaceCatalog)();
+	const catalog = await (
+		options.loadCatalog ?? fetchMarketplaceCatalogWithSegra
+	)();
 	const entry = readCatalogEntries(catalog).find(
 		(candidate) =>
 			candidate.id === requested.id && candidate.type === requested.type,
