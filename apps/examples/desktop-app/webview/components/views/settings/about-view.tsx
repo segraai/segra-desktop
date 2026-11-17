@@ -1,6 +1,15 @@
 "use client";
 
-import { Bug, ExternalLink, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import {
+	Bug,
+	Check,
+	Copy,
+	ExternalLink,
+	Loader2,
+	RefreshCw,
+	Sparkles,
+	Terminal,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -121,6 +130,168 @@ function UpdateRow() {
 					Check for updates
 				</Button>
 			)}
+		</div>
+	);
+}
+
+interface CliInstallStatus {
+	state:
+		| "installed"
+		| "not_installed"
+		| "outdated_link"
+		| "unavailable"
+		| "unsupported";
+	commandName: string;
+	linkPath: string;
+	onPath: boolean;
+	pathHint?: string;
+	message?: string;
+}
+
+/** The PATH line inside a hint ("... : export PATH=...") is what users copy. */
+function copyableHint(hint: string): string {
+	const index = hint.lastIndexOf(": ");
+	return index >= 0 ? hint.slice(index + 2) : hint;
+}
+
+function CommandLineRow() {
+	const [status, setStatus] = useState<CliInstallStatus | null>(null);
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const [copied, setCopied] = useState(false);
+
+	useEffect(() => {
+		let cancelled = false;
+		void desktopClient
+			.invoke<CliInstallStatus>("cli_install_status")
+			.then((next) => {
+				if (!cancelled) setStatus(next);
+			})
+			.catch(() => {
+				// Hide the section if the sidecar can't answer.
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	if (!status || status.state === "unavailable") return null;
+
+	const run = (command: "install_cli" | "uninstall_cli") => {
+		setBusy(true);
+		setError(null);
+		void desktopClient
+			.invoke<CliInstallStatus>(command)
+			.then(setStatus)
+			.catch((err: unknown) =>
+				setError(err instanceof Error ? err.message : String(err)),
+			)
+			.finally(() => setBusy(false));
+	};
+
+	const installed = status.state === "installed";
+	const name = status.commandName;
+	const hint = status.pathHint;
+	return (
+		<div className="flex flex-col gap-3 border-b py-4">
+			<div className="flex items-center justify-between gap-5 max-[720px]:flex-col max-[720px]:items-stretch">
+				<div className="flex flex-col gap-1">
+					<p className="text-base font-semibold text-foreground">
+						Command-line tool
+					</p>
+					<p className="text-sm text-muted-foreground">
+						Use Segra from your terminal with the{" "}
+						<code className="font-mono text-foreground">{name}</code> command.
+					</p>
+				</div>
+				{status.state === "unsupported" ? null : (
+					<div className="flex shrink-0 gap-2">
+						{installed || status.state === "outdated_link" ? (
+							<Button
+								disabled={busy}
+								onClick={() => run("uninstall_cli")}
+								size="sm"
+								type="button"
+								variant="outline"
+							>
+								Remove
+							</Button>
+						) : null}
+						<Button
+							disabled={busy || installed}
+							onClick={() => run("install_cli")}
+							size="sm"
+							type="button"
+							variant={installed ? "outline" : "default"}
+						>
+							{busy ? (
+								<Loader2 className="size-3 animate-spin" />
+							) : installed ? (
+								<Check className="size-3" />
+							) : (
+								<Terminal className="size-3" />
+							)}
+							{installed
+								? "Installed"
+								: status.state === "outdated_link"
+									? "Reinstall"
+									: "Install"}
+						</Button>
+					</div>
+				)}
+			</div>
+			{status.state === "outdated_link" ? (
+				<p className="text-sm text-muted-foreground">
+					The installed command points at an older copy of Segra Desktop.
+					Reinstall to update it.
+				</p>
+			) : null}
+			{status.message ? (
+				<p className="text-sm text-muted-foreground">{status.message}</p>
+			) : null}
+			{error ? <p className="text-sm text-destructive">{error}</p> : null}
+			{installed && hint && !status.onPath ? (
+				<div className="flex flex-col gap-2">
+					<p className="text-sm text-muted-foreground">
+						{hint.slice(0, hint.lastIndexOf(": ") + 1)}
+					</p>
+					<div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2">
+						<code className="min-w-0 flex-1 overflow-x-auto font-mono text-xs whitespace-nowrap text-foreground">
+							{copyableHint(hint)}
+						</code>
+						<Button
+							onClick={() => {
+								void navigator.clipboard
+									?.writeText(copyableHint(hint))
+									.then(() => {
+										setCopied(true);
+										setTimeout(() => setCopied(false), 1500);
+									});
+							}}
+							size="sm"
+							title="Copy"
+							type="button"
+							variant="ghost"
+						>
+							{copied ? (
+								<Check className="size-3" />
+							) : (
+								<Copy className="size-3" />
+							)}
+						</Button>
+					</div>
+				</div>
+			) : null}
+			{installed ? (
+				<p className="text-sm text-muted-foreground">
+					Run <code className="font-mono text-foreground">{name}</code> to
+					start, or{" "}
+					<code className="font-mono text-foreground">
+						{name} auth --provider segra
+					</code>{" "}
+					to sign in.
+				</p>
+			) : null}
 		</div>
 	);
 }
@@ -280,6 +451,7 @@ export function AboutContent({
 			/>
 			<section className="max-w-344">
 				{UPDATES_ENABLED ? <UpdateRow /> : null}
+				<CommandLineRow />
 				{whatsNew ? (
 					<div className="flex items-center justify-between gap-5 border-b py-4 max-[720px]:flex-col max-[720px]:items-stretch">
 						<div className="flex flex-col gap-1">
@@ -337,9 +509,7 @@ export function AboutContent({
 					</div>
 					<div className="flex shrink-0 gap-2">
 						<Button
-							onClick={() =>
-								void openExternalUrl(`${SEGRA_WEB_URL}/privacy`)
-							}
+							onClick={() => void openExternalUrl(`${SEGRA_WEB_URL}/privacy`)}
 							size="sm"
 							type="button"
 							variant="outline"

@@ -97,6 +97,7 @@ import {
 import packageJson from "../package.json";
 import { CLINE_ACCOUNT_NOT_AUTHENTICATED_RESULT } from "../webview/lib/cline-account-state";
 import { MAX_RECORDED_AUDIO_BYTES } from "../webview/lib/voice-input-limits";
+import { getCliInstallStatus, installCli, uninstallCli } from "./cli-install";
 import {
 	DESKTOP_CLIENT_CONTEXT,
 	resolveDesktopTelemetryUser,
@@ -2173,6 +2174,11 @@ export async function handleCommand(
 			typeof args?.limit === "number" ? args.limit : 200,
 		);
 	}
+
+	// ── Command-line tool ─────────────────────────────────────────────
+	if (command === "cli_install_status") return getCliInstallStatus();
+	if (command === "install_cli") return installCli();
+	if (command === "uninstall_cli") return uninstallCli();
 
 	// ── Process context ───────────────────────────────────────────────
 	if (command === "get_process_context") {
