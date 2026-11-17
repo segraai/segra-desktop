@@ -112,6 +112,7 @@ export function OnboardingDoneScreen(props: { mouse: MouseTrackerState }) {
 
 export function OnboardingOAuthPendingScreen(props: {
 	authError: string;
+	authInstructions?: string;
 	authStatus: string;
 	authUrl: string;
 	compact: boolean;
@@ -143,6 +144,10 @@ export function OnboardingOAuthPendingScreen(props: {
 						<text fg="red">{props.authError}</text>
 						<text fg="gray">Esc to go back</text>
 					</box>
+				)}
+
+				{props.authInstructions && !props.authError && (
+					<text fg={defaultFg}>{props.authInstructions}</text>
 				)}
 
 				{props.authUrl && !props.authError && (
@@ -893,7 +898,7 @@ export function OnboardingMainMenuScreen(props: {
 				marginTop={1}
 			>
 				<text fg={defaultFg}>
-					<strong>Welcome to Cline</strong>
+					<strong>Welcome to Segra</strong>
 				</text>
 				<text fg="gray" marginTop={1}>
 					Connect a model provider to get started.

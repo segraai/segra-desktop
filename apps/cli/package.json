@@ -36,7 +36,8 @@
 		"url": "https://github.com/cline/cline/issues"
 	},
 	"bin": {
-		"cline": "src/index.ts"
+		"cline": "src/index.ts",
+		"segra": "src/index.ts"
 	},
 	"engines": {
 		"node": ">=22"

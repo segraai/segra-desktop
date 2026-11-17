@@ -103,6 +103,7 @@ export function useOnboardingController(props: OnboardingControllerProps) {
 	const [oauthProvider, setOauthProvider] = useState("");
 	const [authStatus, setAuthStatus] = useState("");
 	const [authUrl, setAuthUrl] = useState("");
+	const [authInstructions, setAuthInstructions] = useState("");
 	const [authError, setAuthError] = useState("");
 	const [providerSaveError, setProviderSaveError] = useState("");
 	const [activeProviderId, setActiveProviderId] = useState("");
@@ -407,6 +408,7 @@ export function useOnboardingController(props: OnboardingControllerProps) {
 	const resetAuth = useCallback(() => {
 		setAuthStatus("");
 		setAuthUrl("");
+		setAuthInstructions("");
 		setAuthError("");
 		authAbortRef.current = false;
 	}, []);
@@ -454,6 +456,7 @@ export function useOnboardingController(props: OnboardingControllerProps) {
 				isAborted: () => authAbortRef.current,
 				setStatus: setAuthStatus,
 				setAuthUrl,
+				setInstructions: setAuthInstructions,
 				setError: setAuthError,
 				onComplete: handleAuthComplete,
 				telemetry: getCliTelemetryService(),
@@ -854,6 +857,7 @@ export function useOnboardingController(props: OnboardingControllerProps) {
 		providerSaveError,
 		authStatus,
 		authUrl,
+		authInstructions,
 		byoDescription,
 		byoFields,
 		byoFocusedField,

@@ -137,7 +137,7 @@ function promptArgLooksQuoted(arg: string | undefined): boolean {
 function writePromptArgError(args: string[]): void {
 	const renderedArgs = args.join(" ");
 	writeErr(
-		`Unknown command or unquoted prompt: ${renderedArgs}\nPrompt text must be passed as a single quoted argument, for example: cline "fix the tests". Use "cline --help" to see available commands and flags.`,
+		`Unknown command or unquoted prompt: ${renderedArgs}\nPrompt text must be passed as a single quoted argument, for example: segra "fix the tests". Use "segra --help" to see available commands and flags.`,
 	);
 }
 
@@ -166,7 +166,7 @@ export async function runCli(): Promise<void> {
 	// has been applied, so the telemetry singleton's persisted distinct-id
 	// (and any other storage it touches) lands under the user-selected
 	// `--config <dir>` rather than the default home/config location.
-	// `cline hub ...` is plumbing other clients invoke (the desktop app on
+	// `segra hub ...` is plumbing other clients invoke (the desktop app on
 	// every launch, the SSH remote flow on every connect), not a user
 	// activation, so it must not count as one.
 	if (cliArgs[0] !== "hub") {
@@ -196,7 +196,9 @@ export async function runCli(): Promise<void> {
 	// conflict.
 	const authCmd = program
 		.command("auth")
-		.description("Authenticate a provider and configure what model is used")
+		.description(
+			"Authenticate a provider and configure what model is used (e.g. `segra auth --provider segra` for Segra browser sign-in)",
+		)
 		.argument("[provider]", "Provider id (positional shorthand for -p)")
 		.option("-p, --provider <id>", "Provider ID")
 		.option("-k, --apikey <key>", "API key")
@@ -292,7 +294,7 @@ export async function runCli(): Promise<void> {
 
 	const pluginCmd = program
 		.command("plugin")
-		.description("Manage Cline Plugins")
+		.description("Manage Segra Plugins")
 		.action(() => {
 			pluginCmd.help();
 		});
@@ -300,7 +302,7 @@ export async function runCli(): Promise<void> {
 		.command("install")
 		.alias("i")
 		.description(
-			"Install a Cline Plugin from an official keyword, npm, git, URL, or a local path",
+			"Install a Segra Plugin from an official keyword, npm, git, URL, or a local path",
 		)
 		.argument(
 			"<source>",
@@ -342,7 +344,7 @@ export async function runCli(): Promise<void> {
 		.command("uninstall")
 		.alias("remove")
 		.alias("rm")
-		.description("Uninstall a Cline Plugin by name or path")
+		.description("Uninstall a Segra Plugin by name or path")
 		.argument("<name>", "plugin package name, installed slug, or plugin path")
 		.option("--json", "Output as JSON")
 		.option(
@@ -364,18 +366,18 @@ export async function runCli(): Promise<void> {
 		});
 	const skillCmd = program
 		.command("skill")
-		.description("Manage Cline Skills via the open skills CLI (npx skills)")
+		.description("Manage Segra Skills via the open skills CLI (npx skills)")
 		.allowUnknownOption()
 		.passThroughOptions()
 		.argument("[args...]", "arguments forwarded to the skills CLI")
 		.addHelpText(
 			"after",
 			"\nForwards to the open skills CLI via npx. Examples:\n" +
-				"  cline skill add <owner/repo>       Add a skill into Cline\n" +
-				"  cline skill install <owner/repo>   Alias for add\n" +
-				"  cline skill list                   List installed skills\n" +
-				"  cline skill remove                 Remove installed skills\n" +
-				"  cline skill uninstall              Alias for remove\n" +
+				"  segra skill add <owner/repo>       Add a skill into Segra\n" +
+				"  segra skill install <owner/repo>   Alias for add\n" +
+				"  segra skill list                   List installed skills\n" +
+				"  segra skill remove                 Remove installed skills\n" +
+				"  segra skill uninstall              Alias for remove\n" +
 				"\nadd/install and remove/uninstall default to '--agent cline' unless you pass your own --agent.\n" +
 				"Run 'npx skills --help' for the full command reference.",
 		)
@@ -387,7 +389,7 @@ export async function runCli(): Promise<void> {
 	const connectCmd = program
 		.command("connect")
 		.description("Connect to an external channel")
-		.argument("[channel]", "Channel to connect Cline CLI to")
+		.argument("[channel]", "Channel to connect Segra CLI to")
 		.option("--stop", "Kill all current channel connections")
 		.option("--restart", "Restart a channel connection")
 		.option(
@@ -479,7 +481,7 @@ export async function runCli(): Promise<void> {
 				ctx.exitCode = await runMcpWizard();
 			} else {
 				writeln(
-					"MCP wizard requires a TTY. Use cline config mcp to list servers.",
+					"MCP wizard requires a TTY. Use segra config mcp to list servers.",
 				);
 			}
 		});
@@ -648,7 +650,7 @@ export async function runCli(): Promise<void> {
 
 	program
 		.command("version")
-		.description("Show Cline CLI version number")
+		.description("Show Segra CLI version number")
 		.action(async () => {
 			const { showVersion } = await import("./commands/help");
 			showVersion();

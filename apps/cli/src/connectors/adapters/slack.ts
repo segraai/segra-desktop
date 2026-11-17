@@ -778,7 +778,7 @@ class SlackConnector extends ConnectorBase<
 			formatBackgroundStartMessage: (pid) =>
 				`[slack] starting background connector pid=${pid} user=${options.userName} mode=${options.connectionMode}`,
 			foregroundHint:
-				"[slack] use `cline connect slack -i ...` to run in the foreground",
+				"[slack] use `segra connect slack -i ...` to run in the foreground",
 			launchFailureMessage: "failed to launch Slack connector in background",
 		});
 		if (backgroundExitCode !== undefined) {

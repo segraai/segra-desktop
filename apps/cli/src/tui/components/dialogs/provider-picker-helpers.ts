@@ -78,3 +78,18 @@ export function buildClinePassSubscriptionPageUrl(
 	url.searchParams.set("personal", "true");
 	return url.toString();
 }
+
+/**
+ * The OAuth client callbacks emit the provider's instructions and then the
+ * bare URL through the same `onOutput` channel. Keep only the instructions
+ * (e.g. Segra's "Confirm the code ABCD-1234 ...") and drop the URL echo and
+ * the generic default text, which the waiting screen already conveys.
+ */
+export function getOAuthInstructionsToShow(
+	message: string,
+): string | undefined {
+	const text = message.trim();
+	if (!text || /^https?:\/\//i.test(text)) return undefined;
+	if (text === "Complete sign-in in your browser.") return undefined;
+	return text;
+}

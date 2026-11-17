@@ -110,7 +110,7 @@ const TUI_LOCAL_COMMANDS: Array<{
 	},
 	{
 		name: "quit",
-		description: "Exit Cline",
+		description: "Exit Segra",
 	},
 ];
 

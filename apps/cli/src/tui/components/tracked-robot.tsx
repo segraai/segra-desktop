@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState } from "react";
 import { useTheme } from "../hooks/use-theme";
-import { RobotAnimation } from "./robot-animation";
 
 export function useMouseTracker() {
 	const [cursor, setCursor] = useState({ x: 0, y: 0 });
@@ -16,15 +15,31 @@ export function useMouseTracker() {
 	return { cursor, onMouseMove };
 }
 
-export function TrackedRobot(props: { cursorX?: number; cursorY?: number }) {
+const WORDMARK = [
+	"▄▄▄▄ ▄▄▄▄ ▄▄▄▄ ▄▄▄▄ ▄▄▄▄",
+	"█▄▄▄ █▄▄  █ ▄▄ █▄▄▀ █▄▄█",
+	"▄▄▄█ █▄▄▄ █▄▄█ █ ▀▄ █  █",
+];
+
+/**
+ * Segra wordmark shown on the home and onboarding screens. The cursor props are
+ * accepted for call-site compatibility but the mark is static.
+ */
+export function TrackedRobot(_props: { cursorX?: number; cursorY?: number }) {
 	const defaultFg = useTheme().defaultForeground;
 	return (
-		<box width="100%" flexShrink={1} overflow="hidden">
-			<RobotAnimation
-				cursorX={props.cursorX ?? 0}
-				cursorY={props.cursorY ?? 0}
-				defaultColor={defaultFg}
-			/>
+		<box
+			width="100%"
+			flexShrink={1}
+			overflow="hidden"
+			flexDirection="column"
+			alignItems="center"
+		>
+			{WORDMARK.map((row) => (
+				<text key={row} fg={defaultFg}>
+					{row}
+				</text>
+			))}
 		</box>
 	);
 }

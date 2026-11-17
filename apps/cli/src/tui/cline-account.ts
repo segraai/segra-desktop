@@ -110,7 +110,7 @@ async function resolveValidClineAccountAuthToken(input: {
 		});
 		if (!nextCredentials) {
 			throw new Error(
-				"Cline account requires re-authentication. Run cline auth cline.",
+				"Cline account requires re-authentication. Run segra auth cline.",
 			);
 		}
 		const nextAccessToken = formatProviderOAuthApiKey("cline", nextCredentials);

@@ -454,7 +454,7 @@ export async function checkForUpdates(
 	const currentVersion = version;
 	const includeKanban = options.includeKanban ?? true;
 	writeln(
-		`${c.cyan}Checking for updates${includeKanban ? " to Cline CLI and kanban" : ""}…${c.reset}`,
+		`${c.cyan}Checking for updates${includeKanban ? " to Segra CLI and kanban" : ""}…${c.reset}`,
 	);
 
 	const { packageName, updateCommand, packageManager } =
@@ -540,7 +540,7 @@ export async function checkForUpdates(
 		if (cliUpdateAvailable && latestVersion) {
 			if (!updateCommand) {
 				writeln(
-					`${c.dim}Unable to determine Cline update command. Please update manually with your package manager.${c.reset}`,
+					`${c.dim}Unable to determine Segra update command. Please update manually with your package manager.${c.reset}`,
 				);
 				hadFailure = true;
 			} else {
@@ -556,11 +556,11 @@ export async function checkForUpdates(
 					if (exitCode === 0) {
 						installedUpdates.push(`${packageName}@${latestVersion}`);
 						writeln(
-							`${c.dim}The update takes effect the next time cline starts.${c.reset}`,
+							`${c.dim}The update takes effect the next time Segra starts.${c.reset}`,
 						);
 					} else {
 						writeErr(
-							`Cline update failed (exit code ${exitCode}). Try running: ${manualUpdateCommand.command}`,
+							`Segra update failed (exit code ${exitCode}). Try running: ${manualUpdateCommand.command}`,
 						);
 						hadFailure = true;
 					}
@@ -568,7 +568,7 @@ export async function checkForUpdates(
 					const message =
 						error instanceof Error ? error.message : String(error);
 					writeErr(
-						`Failed to run Cline update command ${manualUpdateCommand.command}: ${message}`,
+						`Failed to run Segra update command ${manualUpdateCommand.command}: ${message}`,
 					);
 					hadFailure = true;
 				}

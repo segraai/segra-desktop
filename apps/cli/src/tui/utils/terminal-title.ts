@@ -1,7 +1,7 @@
 import { formatDisplayUserInput } from "@cline/shared";
 import type { AppView, ChatEntry } from "../types";
 
-const APP_TITLE = "Cline";
+const APP_TITLE = "Segra";
 const CHAT_TITLE_PREFIX = "> ";
 const MAX_TERMINAL_TITLE_LENGTH = 80;
 // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping control characters from terminal titles is the purpose of this pattern

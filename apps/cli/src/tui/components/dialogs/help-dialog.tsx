@@ -187,7 +187,7 @@ const HELP_ROWS: HelpRow[] = [
 		key: "/undo",
 		desc: "Restore to a previous checkpoint",
 	},
-	{ kind: "entry", id: "c-quit", key: "/quit", desc: "Exit Cline" },
+	{ kind: "entry", id: "c-quit", key: "/quit", desc: "Exit Segra" },
 	{ kind: "entry", id: "c-help", key: "/help", desc: "Show this help" },
 
 	{ kind: "spacer", id: "s2" },
@@ -234,19 +234,19 @@ const HELP_ROWS: HelpRow[] = [
 	{
 		kind: "entry",
 		id: "w-connect",
-		key: "cline connect",
+		key: "segra connect",
 		desc: "Set up messaging platform integrations",
 	},
 	{
 		kind: "entry",
 		id: "w-schedule",
-		key: "cline schedule",
+		key: "segra schedule",
 		desc: "Create and manage scheduled cron tasks",
 	},
 	{
 		kind: "entry",
 		id: "w-mcp",
-		key: "cline mcp",
+		key: "segra mcp",
 		desc: "Add, remove, and manage MCP servers",
 	},
 ];

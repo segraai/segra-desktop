@@ -17,6 +17,12 @@ import {
 } from "./model";
 
 describe("onboarding model helpers", () => {
+	it("lists Sign in with Segra first in the main menu", () => {
+		const first = getMainMenuOptions()[0];
+		expect(first?.value).toBe("segra");
+		expect(first?.label).toBe("Sign in with Segra");
+	});
+
 	it("hides ClinePass from the main menu unless its feature flag is enabled", () => {
 		expect(
 			getMainMenuOptions().some((option) => option.value === "cline-pass"),
@@ -179,6 +185,7 @@ describe("onboarding model helpers", () => {
 		expect(getOAuthProviderLabel("cline")).toBe("Cline");
 		expect(getOAuthProviderLabel("cline-pass")).toBe("ClinePass");
 		expect(getOAuthProviderLabel("openai-codex")).toBe("ChatGPT");
+		expect(getOAuthProviderLabel("segra")).toBe("Segra");
 		expect(getOAuthProviderLabel("oca")).toBe("oca");
 	});
 

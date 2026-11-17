@@ -194,7 +194,7 @@ describe("createClineAccountService", () => {
 		await expect(
 			createClineAccountService({ config: makeConfig() }),
 		).rejects.toThrow(
-			"Cline account requires re-authentication. Run cline auth cline.",
+			"Cline account requires re-authentication. Run segra auth cline.",
 		);
 	});
 });

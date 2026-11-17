@@ -113,7 +113,7 @@ async function actionCreate(client: HubScheduleClient): Promise<void> {
 	}
 
 	const prompt = await p.text({
-		message: "What should Cline do?",
+		message: "What should Segra do?",
 		placeholder: "Review open PRs and post summaries",
 		validate: (v) => {
 			if (!v?.trim()) return "Prompt is required";
@@ -404,7 +404,7 @@ export async function runScheduleWizard(): Promise<number> {
 	if (!ensured.ok) {
 		s.stop("Failed to connect to hub server");
 		p.log.error(
-			"Schedules require the hub server. Start it with: cline hub start",
+			"Schedules require the hub server. Start it with: segra hub start",
 		);
 		p.outro("Failed");
 		return 1;

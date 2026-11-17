@@ -177,7 +177,7 @@ describe("createHubCommand", () => {
 		expect(mockRequestHubDrain).toHaveBeenCalledWith(
 			"ws://127.0.0.1:25463/hub",
 			"token",
-			"cline hub drain --off",
+			"segra hub drain --off",
 			{ off: true },
 		);
 		expect(JSON.parse(output[0] || "")).toEqual({
@@ -200,7 +200,7 @@ describe("createHubCommand", () => {
 		expect(mockRequestHubDrain).toHaveBeenCalledWith(
 			"ws://127.0.0.1:25463/hub",
 			"token",
-			"cline hub drain",
+			"segra hub drain",
 			{ off: false },
 		);
 		expect(JSON.parse(output[0] || "")).toEqual({
@@ -257,7 +257,7 @@ describe("createHubCommand", () => {
 		expect(mockRequestHubDrain).toHaveBeenLastCalledWith(
 			"ws://127.0.0.1:25463/hub",
 			"token",
-			"cline hub upgrade aborted",
+			"segra hub upgrade aborted",
 			{ off: true },
 		);
 	});
@@ -279,7 +279,7 @@ describe("createHubCommand", () => {
 		expect(mockRequestHubDrain).toHaveBeenLastCalledWith(
 			"ws://127.0.0.1:25463/hub",
 			"token",
-			"cline hub upgrade aborted",
+			"segra hub upgrade aborted",
 			{ off: true },
 		);
 	});

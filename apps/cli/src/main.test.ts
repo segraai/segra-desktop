@@ -668,7 +668,7 @@ describe("runCli lightweight command dispatch", () => {
 			),
 		);
 		expect(consoleError).toHaveBeenCalledWith(
-			expect.stringContaining('Use "cline --help"'),
+			expect.stringContaining('Use "segra --help"'),
 		);
 		expect(runtimeMocks.runAgent).not.toHaveBeenCalled();
 		expect(mockState.runAgentImports).toBe(0);

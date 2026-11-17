@@ -131,7 +131,7 @@ async function runPluginMcpOAuthFollowup(
 			);
 		}
 		options.io?.writeln(
-			'Run "cline mcp" and choose "Authorize OAuth" to authorize them.',
+			'Run "segra mcp" and choose "Authorize OAuth" to authorize them.',
 		);
 		return;
 	}
@@ -147,7 +147,7 @@ async function runPluginMcpOAuthFollowup(
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			options.io?.writeErr(
-				`Warning: failed to authorize MCP server ${candidate.name}: ${message}. Run "cline mcp" and choose "Authorize OAuth" to retry.`,
+				`Warning: failed to authorize MCP server ${candidate.name}: ${message}. Run "segra mcp" and choose "Authorize OAuth" to retry.`,
 			);
 		}
 	}

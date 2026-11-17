@@ -55,8 +55,8 @@ const ACTION_ITEMS: Array<{
 		action: "change-provider",
 		label: "Change Provider",
 		shortcut: "Opt+P",
-		description: "Switch provider and configure credentials",
-		keywords: ["provider", "api key", "account", "auth"],
+		description: "Switch provider, sign in (Segra, Cline) or set an API key",
+		keywords: ["provider", "api key", "account", "auth", "segra", "sign in"],
 	},
 	{
 		action: "theme",
@@ -138,7 +138,7 @@ const ACTION_ITEMS: Array<{
 	},
 	{
 		action: "quit",
-		label: "Exit Cline",
+		label: "Exit Segra",
 		shortcut: "Opt+Q",
 		description: "Close the interactive CLI",
 		keywords: ["quit", "exit"],

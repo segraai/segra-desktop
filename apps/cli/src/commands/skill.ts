@@ -6,14 +6,14 @@ export interface SkillCommandIo {
 	writeErr: (text: string) => void;
 }
 
-// `cline skill` is a thin wrapper around the open skills CLI
+// `segra skill` is a thin wrapper around the open skills CLI
 // (https://www.npmjs.com/package/skills). We run it through `npx` so users
 // don't need a separate global install. The release is pinned in @cline/core
 // (sdk/packages/core/package.json) and bumped by Dependabot.
 const SKILLS_PACKAGE = SKILLS_CLI_PACKAGE;
 
 // Subcommands that write skill files into an agent's skills directory. For a
-// `cline skill` command we default these to Cline unless the user picked their
+// `segra skill` command we default these to Cline unless the user picked their
 // own agent. `use` is intentionally excluded: without --agent it prints the
 // generated prompt to stdout, whereas adding --agent would launch that agent
 // interactively instead — not what someone scoping to Cline would expect.
@@ -146,7 +146,7 @@ export async function runSkillCommand(
 			cleanup();
 			if (error.code === "ENOENT") {
 				io.writeErr(
-					'npx was not found. Install Node.js (which includes npx) to use "cline skill".',
+					'npx was not found. Install Node.js (which includes npx) to use "segra skill".',
 				);
 			} else {
 				io.writeErr(`Failed to run npx ${SKILLS_PACKAGE}: ${error.message}`);

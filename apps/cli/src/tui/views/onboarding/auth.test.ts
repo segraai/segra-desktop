@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const hoisted = vi.hoisted(() => ({
 	loginLocalProvider: vi.fn(),
+	segraLogin: vi.fn(),
 	startClineDeviceAuth: vi.fn(),
 	completeClineDeviceAuth: vi.fn(),
 	saveLocalProviderOAuthCredentials: vi.fn(),
@@ -11,6 +12,8 @@ const hoisted = vi.hoisted(() => ({
 
 vi.mock("@cline/core", () => ({
 	loginLocalProvider: hoisted.loginLocalProvider,
+	getProviderAuthHandler: (id: string) =>
+		id === "segra" ? { login: hoisted.segraLogin } : undefined,
 	startClineDeviceAuth: hoisted.startClineDeviceAuth,
 	completeClineDeviceAuth: hoisted.completeClineDeviceAuth,
 	saveLocalProviderOAuthCredentials: hoisted.saveLocalProviderOAuthCredentials,
@@ -205,5 +208,60 @@ describe("onboarding auth telemetry forwarding", () => {
 		expect(setStatus).toHaveBeenCalledWith(
 			"Could not open browser. Visit the URL below.",
 		);
+	});
+});
+
+describe("segra device sign-in", () => {
+	it("surfaces the device-code instructions, opens the URL and completes", async () => {
+		hoisted.openMock.mockReset();
+		hoisted.openMock.mockResolvedValue(undefined);
+		hoisted.loginLocalProvider.mockReset();
+		hoisted.segraLogin.mockImplementationOnce(
+			async (arg: {
+				callbacks: {
+					onAuth: (info: { url: string; instructions?: string }) => void;
+					onProgress?: (message: string) => void;
+				};
+			}) => {
+				arg.callbacks.onAuth({
+					url: "https://segra.example/device?code=ABCD",
+					instructions:
+						"Confirm the code ABCD in your browser to sign in to Segra.",
+				});
+				arg.callbacks.onProgress?.("Waiting for approval of code ABCD...");
+				return { access: "k", refresh: "k", expires: 0 };
+			},
+		);
+		const setInstructions = vi.fn();
+		const setAuthUrl = vi.fn();
+		const setStatus = vi.fn();
+		const onComplete = vi.fn();
+		runOAuthAuthFlow({
+			providerId: "segra",
+			providerSettingsManager: makeManager(),
+			isAborted: () => false,
+			setStatus,
+			setAuthUrl,
+			setInstructions,
+			setError: vi.fn(),
+			onComplete,
+		});
+		await new Promise((r) => setTimeout(r, 0));
+
+		expect(hoisted.loginLocalProvider).not.toHaveBeenCalled();
+		expect(setInstructions).toHaveBeenCalledWith(
+			"Confirm the code ABCD in your browser to sign in to Segra.",
+		);
+		expect(setAuthUrl).toHaveBeenCalledWith(
+			"https://segra.example/device?code=ABCD",
+		);
+		expect(hoisted.openMock).toHaveBeenCalledWith(
+			"https://segra.example/device?code=ABCD",
+			{ wait: false },
+		);
+		expect(setStatus).toHaveBeenCalledWith(
+			"Waiting for approval of code ABCD...",
+		);
+		expect(onComplete).toHaveBeenCalledWith("segra");
 	});
 });

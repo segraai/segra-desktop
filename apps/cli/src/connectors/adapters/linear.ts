@@ -532,7 +532,7 @@ class LinearConnector extends ConnectorBase<
 			formatBackgroundStartMessage: (pid) =>
 				`[linear] starting background connector pid=${pid} user=${options.userName}`,
 			foregroundHint:
-				"[linear] use `cline connect linear -i ...` to run in the foreground",
+				"[linear] use `segra connect linear -i ...` to run in the foreground",
 			launchFailureMessage: "failed to launch Linear connector in background",
 		});
 		if (backgroundExitCode !== undefined) {

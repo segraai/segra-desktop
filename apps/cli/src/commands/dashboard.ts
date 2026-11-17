@@ -195,7 +195,7 @@ export async function runDashboardCommand(
 		const dashboardUrl =
 			server.inviteUrl || server.publicUrl || server.listenUrl;
 		options.io.writeln(
-			`${c.green}Cline dashboard listening at${c.reset} ${dashboardUrl}`,
+			`${c.green}Segra dashboard listening at${c.reset} ${dashboardUrl}`,
 		);
 		if (server.hubUrl) {
 			options.io.writeln(`${c.dim}Hub endpoint: ${server.hubUrl}${c.reset}`);

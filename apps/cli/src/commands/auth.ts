@@ -40,6 +40,14 @@ const c = {
 	green: "\x1b[32m",
 };
 
+/** Providers that support `segra auth <provider>` browser sign-in. */
+export const OAUTH_LOGIN_PROVIDER_IDS = [
+	"cline",
+	"openai-codex",
+	"oca",
+	"segra",
+] as const;
+
 type AuthIo = {
 	writeln: (text?: string) => void;
 	writeErr: (text: string) => void;
@@ -197,6 +205,8 @@ function saveQuickAuthProviderSettings(input: {
 
 async function askForInputInTerminal(question: string): Promise<string> {
 	if (!process.stdin.isTTY || !process.stdout.isTTY) {
+		// Only reached when a provider flow needs typed input. Device-flow
+		// providers (segra) never prompt, so they work without a TTY.
 		throw new Error("OAuth login requires an interactive terminal session");
 	}
 
@@ -212,7 +222,7 @@ async function askForInputInTerminal(question: string): Promise<string> {
 	});
 }
 
-function createOAuthCallbacks(io: AuthIo): {
+export function createOAuthCallbacks(io: AuthIo): {
 	onAuth: (info: { url: string; instructions?: string }) => void;
 	onPrompt: (prompt: {
 		message: string;
@@ -429,9 +439,10 @@ export async function runAuthProviderCommand(
 	providerId: string,
 	io: AuthIo,
 ): Promise<number> {
+	providerId = normalizeAuthProviderId(providerId);
 	if (!isOAuthProvider(providerId)) {
 		io.writeErr(
-			`provider "${providerId}" does not support OAuth login (supported: cline, openai-codex, oca)`,
+			`provider "${providerId}" does not support OAuth login (supported: ${OAUTH_LOGIN_PROVIDER_IDS.join(", ")})`,
 		);
 		return 1;
 	}

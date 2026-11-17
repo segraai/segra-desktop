@@ -8,7 +8,7 @@ describe("deriveTerminalTitle", () => {
 				appView: "home",
 				entries: [{ kind: "user_submitted", text: "hello" }],
 			}),
-		).toBe("Cline");
+		).toBe("Segra");
 	});
 
 	it("uses the latest submitted user message in chat", () => {

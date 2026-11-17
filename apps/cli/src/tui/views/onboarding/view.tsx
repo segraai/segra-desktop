@@ -40,6 +40,7 @@ export function OnboardingView(props: OnboardingViewProps) {
 		return (
 			<OnboardingOAuthPendingScreen
 				authError={state.authError}
+				authInstructions={state.authInstructions}
 				authStatus={state.authStatus}
 				authUrl={state.authUrl}
 				compact={compact}

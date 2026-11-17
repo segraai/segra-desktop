@@ -220,7 +220,7 @@ export async function runConnectWizard(): Promise<number> {
 	args.push("-i");
 
 	p.log.success(
-		`Running: cline connect ${platform.id} ${redactCommandArgs(args)}`,
+		`Running: segra connect ${platform.id} ${redactCommandArgs(args)}`,
 	);
 	p.outro("Starting connector (Ctrl+C to stop)");
 

@@ -66,6 +66,12 @@ export interface ClinePassSubscriptionOption {
 
 export const MAIN_MENU: MenuOption[] = [
 	{
+		label: "Sign in with Segra",
+		value: "segra",
+		detail: "Private, TEE-attested models",
+		icon: "\u2726",
+	},
+	{
 		label: "Sign in with Cline",
 		value: "cline",
 		detail: "Latest models with regular free promos",
@@ -252,6 +258,9 @@ export function getOAuthProviderLabel(providerId: string): string {
 	}
 	if (providerId === "cline") {
 		return "Cline";
+	}
+	if (providerId === "segra") {
+		return "Segra";
 	}
 	if (providerId === "openai-codex") {
 		return "ChatGPT";

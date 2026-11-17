@@ -1,109 +1,93 @@
-# Cline CLI
+# Segra CLI
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/7123f9d1-afeb-48d5-93fa-e750dec0ebba" width="70%" />
-</p>
-
-<div align="center">
-<table>
-<tbody>
-<td align="center">
-<a href="https://www.npmjs.com/package/cline" target="_blank">NPM</a>
-</td>
-<td align="center">
-<a href="https://marketplace.visualstudio.com/items?itemName=saoudrizwan.claude-dev" target="_blank">VS Code Extension</a>
-</td>
-<td align="center">
-<a href="https://discord.gg/cline" target="_blank">Discord</a>
-</td>
-<td align="center">
-<a href="https://www.reddit.com/r/cline/" target="_blank">r/cline</a>
-</td>
-<td align="center">
-<a href="https://github.com/cline/cline/discussions/categories/feature-requests?discussions_q=is%3Aopen+category%3A%22Feature+Requests%22+sort%3Atop" target="_blank">Feature Requests</a>
-</td>
-<td align="center">
-<a href="https://docs.cline.bot" target="_blank">Docs</a>
-</td>
-</tbody>
-</table>
-</div>
-
-Run Cline in your terminal. Interactive chat for paired sessions, or fully headless for CI/CD and scripting. The CLI shares its agent core with the [Cline VS Code extension](https://marketplace.visualstudio.com/items?itemName=saoudrizwan.claude-dev), JetBrains plugin, and SDK, so plan/act modes, MCP servers, checkpoints, rules, skills, and provider configuration all behave the same across surfaces.
+Run Segra in your terminal. Interactive chat for paired sessions, or fully headless for CI/CD and scripting. The CLI shares its agent core with Segra Desktop, so plan/act modes, MCP servers, checkpoints, rules, skills, provider settings, and your Segra sign-in are the same in both.
 
 ## Install
 
-```sh
-npm install -g cline
-```
+The CLI ships inside [Segra Desktop](https://segra.ai). To use it from a terminal:
 
-For nightly builds:
+1. Open Segra Desktop and go to **Settings → About → Command-line tool**.
+2. Click **Install**. This adds a `segra` command:
+   - **macOS / Linux:** a link at `~/.local/bin/segra`. No admin password is needed. If `~/.local/bin` isn't on your `PATH`, the page shows the line to add to your shell startup file.
+   - **Windows:** a `segra` command added to your user `PATH`. Open a new terminal afterwards.
+3. Run `segra`.
 
-```sh
-npm install -g cline@nightly
-```
+The command always runs the CLI bundled with the app, so it updates when Segra Desktop updates. If an update moves the app, the same page offers **Reinstall**. The Linux AppImage doesn't support this; use the `.deb` or `.rpm` build.
 
-Platform binaries are published for macOS, Linux, and Windows on `arm64` and `x64`. The `cline` package resolves the correct binary for your platform via optional dependencies, so no Node, Bun, or Zig runtime is required at install time.
+To run the CLI from a checkout of this repository instead, see [DEVELOPMENT.md](./DEVELOPMENT.md) (`bun run cli` from the repository root).
 
 ## Quick start
 
 Run interactively:
 
 ```sh
-cline
+segra
 ```
 
 Run a single prompt:
 
 ```sh
-cline "Audit this package and propose fixes"
+segra "Audit this package and propose fixes"
 ```
 
 Pipe input:
 
 ```sh
-cat file.txt | cline "Summarize this"
+cat file.txt | segra "Summarize this"
 ```
 
-See `cline --help` for the full flag reference.
+See `segra --help` for the full flag reference.
+
+## Sign in
+
+Sign in with your Segra account to use Segra's private, TEE-attested models:
+
+```sh
+segra auth --provider segra
+```
+
+This prints a code and opens the Segra web sign-in page in your browser. Confirm the code there and the CLI saves the key. It works without an interactive terminal, so you can run it over SSH and approve from any browser. Running `segra` for the first time also offers **Sign in with Segra** as the first option.
+
+If you already signed in with Segra Desktop, the CLI uses that sign-in; the two share settings in `~/.cline`.
 
 ## Use any provider
 
-Cline supports the same providers as the VS Code extension. You can sign in to Cline directly, use your ChatGPT Subscription through `openai-codex`, or bring an API key from Anthropic, OpenAI, Google Gemini, OpenRouter, AWS Bedrock, GCP Vertex, Cerebras, Groq, and any OpenAI-compatible endpoint.
+You can also sign in to Cline, use your ChatGPT subscription through `openai-codex`, or bring an API key from Anthropic, OpenAI, Google Gemini, OpenRouter, AWS Bedrock, GCP Vertex, Cerebras, Groq, and any OpenAI-compatible endpoint.
 
 ```sh
-cline auth                              # interactive sign-in
-cline auth cline                        # OAuth sign-in
-cline auth --provider anthropic --apikey sk-... --modelid claude-sonnet-4-6
+segra auth                              # interactive sign-in
+segra auth --provider segra             # Segra browser sign-in
+segra auth cline                        # Cline OAuth sign-in
+segra auth --provider anthropic --apikey sk-... --modelid claude-sonnet-4-6
 ```
 
-`cline auth` without a provider opens the interactive auth setup TUI with the same options as the old CLI flow (Sign in with Cline, Sign in with ChatGPT Subscription, Sign in with OCA, or use your own API key).
+`segra auth` without a provider opens the interactive sign-in screen (Sign in with Segra, Cline, or ChatGPT, or use your own API key).
 
-OAuth-supported providers (`cline`, `openai-codex`, `oca`) do not auto-launch a browser on normal startup. Authenticate explicitly first with `cline auth <provider>`. For non-interactive runs, if an OAuth provider is selected and no saved credentials are available, `cline` fails fast with an authentication message instead of launching a hidden browser flow.
+OAuth-supported providers (`segra`, `cline`, `openai-codex`, `oca`) do not launch a browser on normal startup. Sign in explicitly first with `segra auth <provider>`. For non-interactive runs, if an OAuth provider is selected and no saved credentials are available, `segra` fails fast with an authentication message instead of launching a hidden browser flow.
 
 ## Modes
 
-Cline CLI runs in a few different shapes depending on what you need:
+Segra CLI runs in a few different shapes depending on what you need:
 
-- Interactive TUI: `cline` or `cline -i` opens a full terminal UI with plan/act toggle, slash commands, file mentions, and live tool approvals
-- One-shot: `cline "your prompt"` runs a single turn and exits
-- JSON: `cline --json "..."` streams NDJSON events for piping into other tools
-- Yolo: `cline --yolo "..."` skips approval prompts and exits when the turn finishes
-- Zen: `cline --zen "..."` fires the task to the background hub daemon and exits immediately (see below)
+- Interactive TUI: `segra` or `segra -i` opens a full terminal UI with plan/act toggle, slash commands, file mentions, and live tool approvals
+- One-shot: `segra "your prompt"` runs a single turn and exits
+- JSON: `segra --json "..."` streams NDJSON events for piping into other tools
+- Yolo: `segra --yolo "..."` skips approval prompts and exits when the turn finishes
+- Zen: `segra --zen "..."` fires the task to the background hub daemon and exits immediately (see below)
 
 ## Headless mode for CI/CD
 
-Run Cline with zero interaction for scripting and automation. Pipe input, get JSON output, chain commands, integrate into CI/CD pipelines.
+Run Segra with zero interaction for scripting and automation. Pipe input, get JSON output, chain commands, integrate into CI/CD pipelines.
 
 ```sh
 # One-shot prompt, auto-approve all tools
-cline --yolo "Run tests and fix any failures"
+segra --yolo "Run tests and fix any failures"
 
 # Pipe a diff in for review
-git diff origin/main | cline "Review these changes for issues"
+git diff origin/main | segra "Review these changes for issues"
 
 # NDJSON output for downstream tooling
-cline --json "List all TODO comments" | jq -r 'select(.type == "agent_event" and .event.text) | .event.text'
+segra --json "List all TODO comments" | jq -r 'select(.type == "agent_event" and .event.text) | .event.text'
 ```
 
 ## Features
@@ -113,7 +97,7 @@ cline --json "List all TODO comments" | jq -r 'select(.type == "agent_event" and
 - Native MCP support for connecting custom tools
 - Checkpoints with `/undo` to rewind workspace state
 - Sub-agent spawning and agent teams for parallel work
-- OAuth login for Cline, ChatGPT Subscription (`openai-codex`), and OCA
+- Browser sign-in for Segra, plus OAuth login for Cline, ChatGPT Subscription (`openai-codex`), and OCA
 - Configurable thinking budgets per run
 - Cron and event-driven schedules for recurring agent work
 - Chat connectors for Telegram, Google Chat, and WhatsApp
@@ -121,46 +105,46 @@ cline --json "List all TODO comments" | jq -r 'select(.type == "agent_event" and
 ## Usage
 
 ```sh
-# Start Cline CLI without a prompt to enter interactive mode
-cline
+# Start Segra CLI without a prompt to enter interactive mode
+segra
 
 # Single prompt (one-shot) - includes tools, spawn, and teams
-cline "Audit this package and propose fixes"
+segra "Audit this package and propose fixes"
 
 # Interactive mode with a starting prompt
-cline -i "Let's work on this together. First, analyze the current state."
+segra -i "Let's work on this together. First, analyze the current state."
 
 # With a custom system prompt
-cline -i -s "You are a pirate" "Tell me about the sea"
+segra -i -s "You are a pirate" "Tell me about the sea"
 
 # Require approval before each tool call
-cline --auto-approve false "Inspect and modify this repository"
+segra --auto-approve false "Inspect and modify this repository"
 
 # Explicit yolo: enables submit_and_exit and disables spawn/team tools by default
-cline --yolo --retries 5 "Refactor this package"
+segra --yolo --retries 5 "Refactor this package"
 
 # Override consecutive internal mistake (retry) limit (default: 3)
-cline --retries 5 "Fix failing tests"
+segra --retries 5 "Fix failing tests"
 
 # Team workflow with persistent name
-cline --team-name my-team "Plan, implement, and verify release checklist"
-cline --team-name my-team "Continue yesterday's team workflow"
+segra --team-name my-team "Plan, implement, and verify release checklist"
+segra --team-name my-team "Continue yesterday's team workflow"
 
 # Show verbose run stats (elapsed time, tokens, estimated cost when available)
-cline -v "Explain quantum computing"
+segra -v "Explain quantum computing"
 
 # Use a specific provider, model, and access token for a single prompt
-cline -P openrouter -m google/gemini-3-pro -k sk-... "Set up a storybook"
+segra -P openrouter -m google/gemini-3-pro -k sk-... "Set up a storybook"
 
 # Use a different model with the last used provider
-cline -m anthropic/claude-opus-4-6 "Explain string theory"
+segra -m anthropic/claude-opus-4-6 "Explain string theory"
 
 # Stream structured NDJSON output
-cline --json "Summarize this repository"
+segra --json "Summarize this repository"
 
 # Quick provider setup
-cline auth --provider anthropic --apikey sk-... --modelid claude-sonnet-4-6
-cline auth --provider openai-native --apikey sk-... --modelid gpt-5 --baseurl https://api.example.com/v1
+segra auth --provider anthropic --apikey sk-... --modelid claude-sonnet-4-6
+segra auth --provider openai-native --apikey sk-... --modelid gpt-5 --baseurl https://api.example.com/v1
 ```
 
 ### MCP servers
@@ -168,54 +152,54 @@ cline auth --provider openai-native --apikey sk-... --modelid gpt-5 --baseurl ht
 Manage MCP servers with the interactive wizard:
 
 ```sh
-cline mcp
-cline config mcp
+segra mcp
+segra config mcp
 ```
 
-Open the add-server wizard with the name, transport, and command or URL already filled in with `cline mcp install` (`cline mcp add` also works). Stdio servers use everything after `--` as the command and arguments:
+Open the add-server wizard with the name, transport, and command or URL already filled in with `segra mcp install` (`segra mcp add` also works). Stdio servers use everything after `--` as the command and arguments:
 
 ```sh
-cline mcp install fs -- npx -y @modelcontextprotocol/server-filesystem /tmp
+segra mcp install fs -- npx -y @modelcontextprotocol/server-filesystem /tmp
 ```
 
 Remote HTTP and SSE servers take a name, transport, and URL. The wizard still asks for auth details before saving:
 
 ```sh
-cline mcp install ctx7 --transport http https://mcp.context7.com/mcp
-cline mcp install events --transport sse https://example.com/sse
+segra mcp install ctx7 --transport http https://mcp.context7.com/mcp
+segra mcp install events --transport sse https://example.com/sse
 ```
 
 Because this command opens the wizard, it requires a TTY.
 
 ### Connectors
 
-Bridge a chat surface into RPC-backed Cline sessions. Each conversation thread maps to a session with full context. Supported platforms: Telegram, Slack, Google Chat, WhatsApp, and Linear.
+Bridge a chat surface into RPC-backed Segra sessions. Each conversation thread maps to a session with full context. Supported platforms: Telegram, Slack, Google Chat, WhatsApp, and Linear.
 
 ```sh
 # Telegram (polling mode)
-cline connect telegram -k 123456:ABCDEF...
+segra connect telegram -k 123456:ABCDEF...
 
 # Slack (webhook mode)
-cline connect slack --bot-token $SLACK_BOT_TOKEN --signing-secret $SLACK_SIGNING_SECRET --base-url https://your-domain.com
+segra connect slack --bot-token $SLACK_BOT_TOKEN --signing-secret $SLACK_SIGNING_SECRET --base-url https://your-domain.com
 
 # Slack (socket mode)
-cline connect slack --bot-token $SLACK_BOT_TOKEN --app-token $SLACK_APP_TOKEN
+segra connect slack --bot-token $SLACK_BOT_TOKEN --app-token $SLACK_APP_TOKEN
 
 # Google Chat (webhook mode)
-cline connect gchat --base-url https://your-domain.com
+segra connect gchat --base-url https://your-domain.com
 
 # WhatsApp (webhook mode)
-cline connect whatsapp --base-url https://your-domain.com
+segra connect whatsapp --base-url https://your-domain.com
 
 # Linear (webhook mode)
-cline connect linear --api-key $LINEAR_API_KEY --base-url https://your-domain.com
+segra connect linear --api-key $LINEAR_API_KEY --base-url https://your-domain.com
 
 # Stop connector bridges and delete their sessions
-cline connect --stop
-cline connect --stop telegram
+segra connect --stop
+segra connect --stop telegram
 ```
 
-In chat surfaces, connector slash commands include `/help`, `/start`, `/new`, `/clear`, `/whereami`, `/tools`, `/yolo`, `/cwd <path>`, `/schedule`, `/abort`, and `/exit`. Run `cline connect <adapter> --help` to see the full flag list for any adapter.
+In chat surfaces, connector slash commands include `/help`, `/start`, `/new`, `/clear`, `/whereami`, `/tools`, `/yolo`, `/cwd <path>`, `/schedule`, `/abort`, and `/exit`. Run `segra connect <adapter> --help` to see the full flag list for any adapter.
 
 ### Schedules
 
@@ -226,19 +210,19 @@ provider and model. If only `--provider` is given, the schedule uses that
 provider's saved model.
 
 ```sh
-cline schedule create "Daily code review" \
+segra schedule create "Daily code review" \
   --cron "0 9 * * MON-FRI" \
   --prompt "Review PRs opened yesterday and summarize issues." \
   --workspace /path/to/repo \
   --timeout 3600 \
   --tags automation,review
 
-cline schedule list
-cline schedule get <schedule-id>
-cline schedule trigger <schedule-id>
-cline schedule history <schedule-id> --limit 20
-cline schedule export <schedule-id> > daily-review.yaml
-cline schedule import ./daily-review.yaml
+segra schedule list
+segra schedule get <schedule-id>
+segra schedule trigger <schedule-id>
+segra schedule history <schedule-id> --limit 20
+segra schedule export <schedule-id> > daily-review.yaml
+segra schedule import ./daily-review.yaml
 ```
 
 Schedules can route results back to chat surfaces with `--delivery-adapter`, `--delivery-bot`, and `--delivery-thread`.
@@ -276,20 +260,20 @@ Schedules can route results back to chat surfaces with `--delivery-adapter`, `--
 
 ## Top-level commands
 
-- `cline config` - Open the interactive config view
-- `cline history|h [options]` - List session history or manage saved sessions
-- `cline version` - Show CLI version
-- `cline update [options]` - Check for CLI and kanban updates
-- `cline auth <provider>` - Authenticate or seed provider credentials
-- `cline connect <adapter>` - Run a chat connector bridge (`telegram`, `gchat`, `whatsapp`)
-- `cline connect --stop [adapter]` - Stop connector bridge processes and their sessions
-- `cline schedule <command>` - Create and manage scheduled runs
-- `cline doctor` - Inspect local CLI health and stale processes
-- `cline doctor fix` - Kill stale local RPC listeners and old CLI processes
-- `cline doctor log` - Open the CLI runtime log file (`CLINE_LOG_PATH` when set)
-- `cline hook` - Handle a hook payload from stdin
-- `cline hub` - Manage the local hub daemon
-- `cline kanban` - Run the external `kanban` app, installing it first when needed
+- `segra config` - Open the interactive config view
+- `segra history|h [options]` - List session history or manage saved sessions
+- `segra version` - Show CLI version
+- `segra update [options]` - Check for CLI and kanban updates
+- `segra auth <provider>` - Authenticate or seed provider credentials
+- `segra connect <adapter>` - Run a chat connector bridge (`telegram`, `gchat`, `whatsapp`)
+- `segra connect --stop [adapter]` - Stop connector bridge processes and their sessions
+- `segra schedule <command>` - Create and manage scheduled runs
+- `segra doctor` - Inspect local CLI health and stale processes
+- `segra doctor fix` - Kill stale local RPC listeners and old CLI processes
+- `segra doctor log` - Open the CLI runtime log file (`CLINE_LOG_PATH` when set)
+- `segra hook` - Handle a hook payload from stdin
+- `segra hub` - Manage the local hub daemon
+- `segra kanban` - Run the external `kanban` app, installing it first when needed
 
 Compiled CLI binaries embed the plugin bootstrap, SDK modules, and dashboard
 assets. They can start the Hub, load SDK plugins, and serve the dashboard without
@@ -299,35 +283,34 @@ flag, not a user command.
 
 ## Hub dashboard
 
-Run `cline hub` to list hub subcommands. To start the browser dashboard:
+Run `segra hub` to list hub subcommands. To start the browser dashboard:
 
 ```sh
-cline hub dashboard
+segra hub dashboard
 ```
 
 The dashboard opens in your default browser and stays running until you press Ctrl+C. Use `--no-open` to print the URL without opening a browser, or `--port` to change the dashboard's HTTP/WebSocket port (default: `8787`):
 
 ```sh
-cline hub dashboard --port 9090 --no-open
-cline hub dashboard --help
+segra hub dashboard --port 9090 --no-open
+segra hub dashboard --help
 ```
 
-Dashboard options also include `--cwd`, `--config`, `--data-dir`, `--host`, `--public-url`, and `--room-secret`. For LAN or tunnel access, see the [Cline Hub configuration and security guidance](../cline-hub/README.md). The old `cline dashboard` invocation remains a hidden compatibility alias; use `cline hub dashboard` in new scripts.
+Dashboard options also include `--cwd`, `--config`, `--data-dir`, `--host`, `--public-url`, and `--room-secret`. For LAN or tunnel access, see the [Hub configuration and security guidance](../cline-hub/README.md). The old `segra dashboard` invocation remains a hidden compatibility alias; use `segra hub dashboard` in new scripts.
 
 ## Zen mode
 
 `--zen` (alias `-z`) runs a task in the background hub daemon and exits the CLI immediately. It is intended for long-running tasks you want to fire off and walk away from.
 
 ```sh
-cline --zen "Refactor the authentication module and add unit tests"
+segra --zen "Refactor the authentication module and add unit tests"
 ```
 
 Behavior:
 
 - The CLI starts (or reuses) the local hub daemon, submits the task, then exits. It does not stream output or stay attached to the session.
 - Because there is no human in the loop once the CLI exits, zen sessions run with full tool auto-approval (same semantics as `--yolo`). `spawn`/`team` tools are disabled by default for safety, consistent with yolo-mode defaults.
-- If the Cline menubar app is running, it subscribes to hub `ui.notify` events and will surface a system notification when the task completes.
-- If the menubar app is not running, there is no live UI for the task. Use `cline history` later to find the session and inspect the result.
+- There is no live UI for the task. Use `segra history` later to find the session and inspect the result.
 - `--zen` is incompatible with `--data-dir` (the implicit sandbox requires a local backend that exits with the CLI) and with `--tui` (there is no terminal UI to render into).
 
 ## Tool approval
@@ -335,7 +318,7 @@ Behavior:
 Tool calls are auto-approved by default. Use `--auto-approve false` to require review before tool execution.
 
 ```sh
-cline --auto-approve false "Inspect and modify this repository"
+segra --auto-approve false "Inspect and modify this repository"
 ```
 
 When approval is required, the CLI prompts in TTY mode:
@@ -353,6 +336,8 @@ Desktop-integrated approval mode is also supported via env wiring (`CLINE_TOOL_A
 ## Environment variables
 
 - `ANTHROPIC_API_KEY` - API key for Anthropic
+- `SEGRA_API_KEY` - Segra API key (when using `-P segra`; normally `segra auth --provider segra` saves one for you)
+- `SEGRA_BASE_URL` - Segra server URL (default `https://web.segra.ai/api/app/v1`; set it for a local or staging Segra server)
 - `CLINE_API_KEY` - API key for Cline (when using `-P cline`)
 - `OPENAI_API_KEY` - API key for OpenAI (when using `-P openai`)
 - `OPENROUTER_API_KEY` - API key for OpenRouter (when using `-P openrouter`)
@@ -371,23 +356,12 @@ Desktop-integrated approval mode is also supported via env wiring (`CLINE_TOOL_A
 - `CLINE_LOG_LEVEL` - Runtime log level (`trace|debug|info|warn|error|fatal|silent`, default `info`)
 - `CLINE_LOG_PATH` - Runtime log file path (default `<CLINE_DATA_DIR>/logs/cline.log`)
 - `CLINE_LOG_NAME` - Logger name embedded in runtime log records
-- `CLINE_DEBUG` - Set to `1`/`true` to print wrapper diagnostics (e.g. the CA bundle summary)
 
 `--key` takes precedence over environment variables.
 
 ## Certificate trust
 
-The CLI automatically trusts your operating system's certificate store, so it
-works behind corporate TLS-inspecting proxies and with self-signed/internal
-endpoints without any setup. On launch the `cline` wrapper harvests the OS trust
-anchors and writes them to `~/.cline/cli-node-extra-ca-certs.pem`, then points
-the runtime's `NODE_EXTRA_CA_CERTS` at that bundle. The file is regenerated when
-it changes and is safe to delete (it is rebuilt on the next run).
-
-If you set `NODE_EXTRA_CA_CERTS` yourself, your certificates are **merged** into
-that bundle alongside the system store rather than replacing it. Run with
-`CLINE_DEBUG=1` to see how many OS and user CAs were loaded and where the bundle
-was written.
+The CLI trusts your operating system's certificate store, so it works behind corporate TLS-inspecting proxies and with self-signed or internal endpoints without any setup. The binary bundled with Segra Desktop is built with this enabled.
 
 ## Contributing
 
@@ -395,4 +369,4 @@ See [DEVELOPMENT.md](./DEVELOPMENT.md) for local development setup, monorepo str
 
 ## License
 
-[Apache 2.0 © Cline Bot Inc.](https://github.com/cline/cline/blob/main/LICENSE)
+Segra CLI is based on [Cline](https://github.com/cline/cline), licensed under [Apache 2.0 © Cline Bot Inc.](https://github.com/cline/cline/blob/main/LICENSE)

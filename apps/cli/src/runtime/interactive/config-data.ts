@@ -109,7 +109,7 @@ export function createInteractiveConfigDataLoader(input: {
 			if (item.agentPlugin === true) {
 				if (!input.toggleCoreSettings) {
 					throw new Error(
-						"Agent Plugin settings require a connected Cline Hub.",
+						"Agent Plugin settings require a connected Segra Hub.",
 					);
 				}
 				const result = await input.toggleCoreSettings({

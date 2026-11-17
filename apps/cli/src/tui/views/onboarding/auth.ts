@@ -1,5 +1,6 @@
 import {
 	completeClineDeviceAuth,
+	getProviderAuthHandler,
 	type ITelemetryService,
 	isOAuthProvider,
 	loginLocalProvider,
@@ -29,6 +30,8 @@ export function runOAuthAuthFlow(input: {
 	isAborted: () => boolean;
 	setStatus: (status: string) => void;
 	setAuthUrl: (url: string) => void;
+	/** Receives provider-supplied instructions (e.g. the Segra device code). */
+	setInstructions?: (instructions: string) => void;
 	setError: (error: string) => void;
 	onComplete: (providerId: OnboardingOAuthProviderId) => void;
 	telemetry?: ITelemetryService;
@@ -37,22 +40,40 @@ export function runOAuthAuthFlow(input: {
 		input.providerId,
 	);
 
-	loginLocalProvider(
-		input.providerId,
-		existing,
-		(url: string) => {
-			input.setAuthUrl(url);
-			input.setStatus("Waiting for sign-in...");
-			try {
-				void open(url, { wait: false }).catch(() => {
-					input.setStatus("Could not open browser. Visit the URL below.");
-				});
-			} catch {
+	const openUrl = (url: string) => {
+		input.setAuthUrl(url);
+		input.setStatus("Waiting for sign-in...");
+		try {
+			void open(url, { wait: false }).catch(() => {
 				input.setStatus("Could not open browser. Visit the URL below.");
-			}
-		},
-		input.telemetry,
-	)
+			});
+		} catch {
+			input.setStatus("Could not open browser. Visit the URL below.");
+		}
+	};
+
+	// Segra's device flow carries a code the user must confirm in the browser;
+	// loginLocalProvider drops the instructions, so call the handler directly.
+	const handler =
+		input.providerId === "segra"
+			? getProviderAuthHandler(input.providerId)
+			: undefined;
+	const login: Promise<Awaited<ReturnType<typeof loginLocalProvider>>> = handler
+		? handler.login({
+				settings: existing,
+				telemetry: input.telemetry,
+				callbacks: {
+					onAuth: ({ url, instructions }) => {
+						if (instructions) input.setInstructions?.(instructions);
+						openUrl(url);
+					},
+					onPrompt: async (prompt) => prompt.defaultValue ?? "",
+					onProgress: (message) => input.setStatus(message),
+				},
+			})
+		: loginLocalProvider(input.providerId, existing, openUrl, input.telemetry);
+
+	login
 		.then((credentials) => {
 			if (input.isAborted()) return;
 			saveLocalProviderOAuthCredentials(

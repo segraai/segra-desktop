@@ -1,9 +1,10 @@
 import {
 	completeClineDeviceAuth,
+	createOAuthClientCallbacks,
+	getProviderAuthHandler,
 	getProviderConfigFields,
 	isLocalAuthProvider,
 	isOAuthProvider,
-	loginLocalProvider,
 	type ProviderConfigFieldKey,
 	type ProviderConfigFieldRequirement,
 	ProviderSettingsManager,
@@ -40,6 +41,7 @@ import {
 } from "../searchable-list";
 import {
 	buildClinePassSubscriptionPageUrl,
+	getOAuthInstructionsToShow,
 	resolveOAuthWaitKeyAction,
 	saveManualProviderApiKey,
 } from "./provider-picker-helpers";
@@ -770,6 +772,7 @@ export function OAuthLoginContent(
 	);
 	const [status, setStatus] = useState("Opening browser...");
 	const [authUrl, setAuthUrl] = useState("");
+	const [authInstructions, setAuthInstructions] = useState("");
 	const [error, setError] = useState("");
 	const [deviceUserCode, setDeviceUserCode] = useState("");
 	const [deviceVerifyUrl, setDeviceVerifyUrl] = useState("");
@@ -861,7 +864,16 @@ export function OAuthLoginContent(
 		const manager = new ProviderSettingsManager();
 		const existing = manager.getProviderSettings(providerId);
 
-		loginLocalProvider(providerId, existing, (url: string) => {
+		const handler = getProviderAuthHandler(providerId);
+		if (!handler) {
+			setError(`provider "${providerId}" does not support OAuth login`);
+			setStatus("Authentication failed");
+			return cancelAuthAttempt;
+		}
+		// Use the auth handler directly (rather than loginLocalProvider) so the
+		// provider's instructions are surfaced; device-style flows such as Segra
+		// put the code the user must confirm in the browser there.
+		const showUrl = (url: string) => {
 			setAuthUrl(url);
 			setStatus("Waiting for authentication in browser...");
 			try {
@@ -873,7 +885,17 @@ export function OAuthLoginContent(
 			} catch {
 				setStatus("Could not open browser automatically. Open the URL below.");
 			}
-		})
+		};
+		const callbacks = createOAuthClientCallbacks({
+			onPrompt: async (prompt) => prompt.defaultValue ?? "",
+			onOutput: (message) => {
+				const text = getOAuthInstructionsToShow(message);
+				if (text) setAuthInstructions(text);
+			},
+			openUrl: showUrl,
+		});
+		handler
+			.login({ settings: existing, callbacks })
 			.then((credentials) => {
 				if (!isActiveAuthAttempt(attempt)) return;
 				saveLocalProviderOAuthCredentials(
@@ -949,6 +971,8 @@ export function OAuthLoginContent(
 			</text>
 
 			<text>{status}</text>
+
+			{authInstructions && <text>{authInstructions}</text>}
 
 			{authUrl && (
 				<text fg="gray" selectable>

@@ -119,7 +119,7 @@ describe("runDashboardCommand", () => {
 		});
 		expect(opened).toEqual(["http://127.0.0.1:9090/?roomSecret=secret"]);
 		expect(stop).toHaveBeenCalledTimes(1);
-		expect(output.join("\n")).toContain("Cline dashboard listening at");
+		expect(output.join("\n")).toContain("Segra dashboard listening at");
 		expect(output.join("\n")).toContain("ws://127.0.0.1:25463/hub");
 		expect(errors).toEqual([]);
 		expect(process.env.WORKSPACE_ROOT).toBe(originalEnv.WORKSPACE_ROOT);

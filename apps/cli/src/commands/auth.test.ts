@@ -3,9 +3,12 @@ import { fileURLToPath } from "node:url";
 import type { ProviderSettingsManager } from "@cline/core";
 import { describe, expect, it, vi } from "vitest";
 import {
+	createOAuthCallbacks,
 	getPersistedProviderApiKey,
+	isOAuthProvider,
 	normalizeAuthProviderId,
 	parseAuthCommandArgs,
+	runAuthProviderCommand,
 	saveOAuthProviderSettings,
 } from "./auth";
 
@@ -100,6 +103,40 @@ describe("getPersistedProviderApiKey", () => {
 describe("normalizeAuthProviderId", () => {
 	it("keeps CLI-only codex shorthand in CLI parsing", () => {
 		expect(normalizeAuthProviderId("codex")).toBe("openai-codex");
+	});
+});
+
+describe("segra sign-in", () => {
+	it("normalizes casing and whitespace and is an OAuth provider", () => {
+		expect(normalizeAuthProviderId("  Segra ")).toBe("segra");
+		expect(isOAuthProvider("segra")).toBe(true);
+	});
+
+	it("lists segra in the unsupported-provider error", async () => {
+		const writeErr = vi.fn();
+		const code = await runAuthProviderCommand(
+			{} as unknown as ProviderSettingsManager,
+			"anthropic",
+			{ writeln: vi.fn(), writeErr },
+		);
+		expect(code).toBe(1);
+		expect(writeErr.mock.calls[0][0]).toContain("segra");
+	});
+
+	it("prints the confirmation code instructions and URL", () => {
+		const lines: string[] = [];
+		const callbacks = createOAuthCallbacks({
+			writeln: (text) => lines.push(text ?? ""),
+			writeErr: vi.fn(),
+		});
+		callbacks.onAuth({
+			url: "http://127.0.0.1:9/device?code=ABCD-1234",
+			instructions:
+				"Confirm the code ABCD-1234 in your browser to sign in to Segra.",
+		});
+		const out = lines.join("\n");
+		expect(out).toContain("ABCD-1234 in your browser");
+		expect(out).toContain("http://127.0.0.1:9/device?code=ABCD-1234");
 	});
 });
 

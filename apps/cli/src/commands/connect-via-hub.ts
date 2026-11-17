@@ -269,7 +269,7 @@ export async function startConnectorViaHub(input: {
 			`[connect] ${input.channel} connector ${input.instanceId} started under hub supervision${describeRecord(record)}`,
 		);
 		input.io.writeln(
-			"[connect] the hub will restart it if it exits; use `cline connect --stop` to retire it",
+			"[connect] the hub will restart it if it exits; use `segra connect --stop` to retire it",
 		);
 		return { delegated: true, exitCode: 0 };
 	} catch (error) {

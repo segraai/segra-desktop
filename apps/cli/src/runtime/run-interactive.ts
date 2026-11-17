@@ -891,14 +891,14 @@ export async function runInteractive(
 			prepareTerminalForPostTuiOutput();
 		}
 		writeln(
-			"The shared Cline Hub was updated by another Cline installation. Updating this CLI…",
+			"The shared Segra Hub was updated by another Segra installation. Updating this CLI…",
 		);
 		const { checkForUpdates } = await import("../commands/update");
 		const exitCode = await checkForUpdates({ includeKanban: false });
 		writeln(
 			exitCode === 0
 				? "Start cline again to reconnect to the updated Hub."
-				: "Update did not complete. Run 'cline update' manually, then start cline again.",
+				: "Update did not complete. Run 'segra update' manually, then start segra again.",
 		);
 	}
 }

@@ -1022,7 +1022,7 @@ class DiscordConnector extends ConnectorBase<
 			formatBackgroundStartMessage: (pid) =>
 				`[discord] starting background connector pid=${pid} application=${options.applicationId}`,
 			foregroundHint:
-				"[discord] use `cline connect discord -i ...` to run in the foreground",
+				"[discord] use `segra connect discord -i ...` to run in the foreground",
 			launchFailureMessage: "failed to launch Discord connector in background",
 		});
 		if (backgroundExitCode !== undefined) {

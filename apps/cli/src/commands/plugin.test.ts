@@ -1016,7 +1016,7 @@ export default {
 			"Plugin MCP servers may require OAuth authorization",
 		);
 		expect(output.join("\n")).toContain("non-interactive-docs");
-		expect(output.join("\n")).toContain('Run "cline mcp"');
+		expect(output.join("\n")).toContain('Run "segra mcp"');
 	});
 
 	it("prints JSON output for official plugin installs", async () => {

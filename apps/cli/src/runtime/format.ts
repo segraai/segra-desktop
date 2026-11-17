@@ -45,7 +45,7 @@ export async function resolveMistakeLimitDecision(
 		};
 	}
 	const answer = await askQuestionInTerminal(
-		`mistake_limit_reached (${context.consecutiveMistakes}/${context.maxConsecutiveMistakes})\nLatest: ${summary}\nHow should Cline continue?`,
+		`mistake_limit_reached (${context.consecutiveMistakes}/${context.maxConsecutiveMistakes})\nLatest: ${summary}\nHow should Segra continue?`,
 		["Try a different approach", "Stop this run"],
 	);
 	const normalized = answer.trim().toLowerCase();

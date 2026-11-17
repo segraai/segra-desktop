@@ -157,15 +157,15 @@ export const THEMES: readonly ThemeDefinition[] = [
 	},
 	{
 		id: "dark",
-		label: "Cline Dark",
-		description: "Cline's accents on deep charcoal",
+		label: "Segra Dark",
+		description: "Segra accents on deep charcoal",
 		variant: "dark",
 		background: "#14161b",
 		foreground: "#e8eaed",
 	},
 	{
 		id: "light",
-		label: "Cline Light",
+		label: "Segra Light",
 		description: "Crisp white, high-contrast accents",
 		variant: "light",
 		background: "#ffffff",

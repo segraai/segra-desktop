@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ProviderSettingsManager } from "@cline/core";
+import { isOAuthProvider, ProviderSettingsManager } from "@cline/core";
 import { afterEach, describe, expect, it } from "vitest";
 import {
 	getPersistedProviderApiKey,
@@ -9,6 +9,7 @@ import {
 } from "../../../utils/provider-auth";
 import {
 	buildClinePassSubscriptionPageUrl,
+	getOAuthInstructionsToShow,
 	resolveOAuthWaitKeyAction,
 	saveManualProviderApiKey,
 } from "./provider-picker-helpers";
@@ -160,5 +161,53 @@ describe("saveManualProviderApiKey", () => {
 		expect(getPersistedProviderApiKey("cline-pass", clinePassSettings)).toBe(
 			"manual-api-key",
 		);
+	});
+});
+
+describe("segra sign-in", () => {
+	it("is an OAuth provider that counts as configured with an access token", () => {
+		expect(isOAuthProvider("segra")).toBe(true);
+		expect(
+			isProviderConfigured("segra", {
+				provider: "segra",
+				auth: { accessToken: "sk-segra" },
+			}),
+		).toBe(true);
+		expect(isProviderConfigured("segra", { provider: "segra" })).toBe(false);
+	});
+
+	it("is pinned at the top of the Popular section", async () => {
+		const dir = mkdtempSync(join(tmpdir(), "segra-picker-"));
+		try {
+			const manager = new ProviderSettingsManager({
+				dataDir: dir,
+			});
+			const { listLocalProviders } = await import(
+				"../../../utils/provider-catalog"
+			);
+			const { providers } = await listLocalProviders(manager);
+			const popular = providers.filter((p) =>
+				p.capabilities?.includes("popular"),
+			);
+			// Popular rank 0, tied with the bundled local models.
+			expect(popular.slice(0, 2).map((p) => p.id)).toContain("segra");
+			expect(providers.slice(0, 2).map((p) => p.id)).toContain("segra");
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it("shows the device code instructions but not the URL echo or default text", () => {
+		expect(
+			getOAuthInstructionsToShow(
+				"Confirm the code ABCD-1234 in your browser to sign in to Segra.",
+			),
+		).toContain("ABCD-1234");
+		expect(
+			getOAuthInstructionsToShow("https://segra.ai/device"),
+		).toBeUndefined();
+		expect(
+			getOAuthInstructionsToShow("Complete sign-in in your browser."),
+		).toBeUndefined();
 	});
 });

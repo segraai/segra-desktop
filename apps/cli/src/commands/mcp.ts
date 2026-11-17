@@ -1,11 +1,11 @@
 import {
 	buildMcpInstallTransport as buildCoreMcpInstallTransport,
 	type McpInstallOptions as CoreMcpInstallOptions,
+	type McpUninstallOptions as CoreMcpUninstallOptions,
+	type McpUninstallResult as CoreMcpUninstallResult,
 	installMcpServer,
 	type McpInstallResult,
 	type McpServerTransportConfig,
-	type McpUninstallOptions as CoreMcpUninstallOptions,
-	type McpUninstallResult as CoreMcpUninstallResult,
 	uninstallMcpServer,
 } from "@cline/core";
 import type { McpAddDefaults } from "../wizards/mcp";
@@ -104,7 +104,7 @@ export async function runMcpInstallCommand(
 			options.isTty ?? (process.stdin.isTTY && process.stdout.isTTY);
 		if (!isTty) {
 			throw new Error(
-				"cline mcp install opens the MCP wizard and requires a TTY. Pass --yes to install noninteractively.",
+				"segra mcp install opens the MCP wizard and requires a TTY. Pass --yes to install noninteractively.",
 			);
 		}
 		const defaults = buildMcpInstallDefaults(options);

@@ -6,7 +6,7 @@ export function createDashboardCommand(
 	setExitCode: (code: number) => void,
 ): Command {
 	const dashboardCmd = new Command("dashboard")
-		.description("Start the Cline Hub dashboard and open it in a browser")
+		.description("Start the Segra Hub dashboard and open it in a browser")
 		.option("--config <dir>", "configuration directory")
 		.option("-c, --cwd <path>", "Workspace root", process.cwd())
 		.option(
