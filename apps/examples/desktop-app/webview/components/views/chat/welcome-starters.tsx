@@ -7,10 +7,7 @@ import {
 	type LucideIcon,
 	Mail,
 } from "lucide-react";
-import {
-	WELCOME_STARTERS,
-	type WelcomeStarter,
-} from "@/lib/welcome-starters";
+import { WELCOME_STARTERS, type WelcomeStarter } from "@/lib/welcome-starters";
 
 const STARTER_ICONS: Record<string, LucideIcon> = {
 	"extract-client-documents": FileSpreadsheet,

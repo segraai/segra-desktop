@@ -38,8 +38,7 @@ export function LocalModelsCard() {
 					<p className="mt-2 text-sm leading-6 text-foreground">
 						The most private option: models run right here, nothing you type
 						leaves this computer, and they work offline. But they're slow on
-						most computers and give simpler answers, so start with the
-						smallest.
+						most computers and give simpler answers, so start with the smallest.
 					</p>
 				</div>
 			</div>

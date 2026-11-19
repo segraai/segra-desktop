@@ -1,5 +1,11 @@
 # Cline Desktop Changelog
 
+## 0.0.51
+
+- Normal mode: a run's working steps fold into one live row with a dancing robot. Developer mode has an option to fold steps too
+- Attachments send the real file, not just its extracted text
+- Built-in document tools
+
 ## 0.0.48
 
 - GPT-6 models (such as `gpt-6-sol` and `gpt-6.1-sol`) work on OpenAI and Azure OpenAI-compatible endpoints. Before, every request was rejected because Cline sent `max_tokens` instead of `max_completion_tokens`

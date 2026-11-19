@@ -9,9 +9,13 @@ import {
 	DEFAULT_APP_MODE,
 	isAppMode,
 	readStoredAppMode,
+	readStoredStepsExpanded,
+	STEPS_EXPANDED_STORAGE_KEY,
 	setStoredAppMode,
+	setStoredStepsExpanded,
 	useAppMode,
 	useIsNormalMode,
+	useStepsExpanded,
 } from "./app-mode";
 
 afterEach(() => {
@@ -78,6 +82,39 @@ describe("useAppMode", () => {
 			window.dispatchEvent(new StorageEvent("storage"));
 		});
 		expect(container.textContent).toBe("normal:true");
+		await act(async () => root.unmount());
+	});
+});
+
+describe("steps expanded preference", () => {
+	it("defaults to on and saves changes", () => {
+		expect(readStoredStepsExpanded()).toBe(true);
+		setStoredStepsExpanded(false);
+		expect(window.localStorage.getItem(STEPS_EXPANDED_STORAGE_KEY)).toBe(
+			"false",
+		);
+		expect(readStoredStepsExpanded()).toBe(false);
+		setStoredStepsExpanded(true);
+		expect(readStoredStepsExpanded()).toBe(true);
+	});
+
+	it("useStepsExpanded is false in normal mode and follows the preference in developer mode", async () => {
+		const seen: boolean[] = [];
+		function Probe() {
+			seen.push(useStepsExpanded());
+			return null;
+		}
+		Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+		const root = createRoot(document.createElement("div"));
+		await act(async () => root.render(createElement(Probe)));
+		expect(seen.at(-1)).toBe(false);
+		await act(async () => setStoredAppMode("developer"));
+		expect(seen.at(-1)).toBe(true);
+		await act(async () => setStoredStepsExpanded(false));
+		expect(seen.at(-1)).toBe(false);
+		await act(async () => setStoredAppMode("normal"));
+		await act(async () => setStoredStepsExpanded(true));
+		expect(seen.at(-1)).toBe(false);
 		await act(async () => root.unmount());
 	});
 });

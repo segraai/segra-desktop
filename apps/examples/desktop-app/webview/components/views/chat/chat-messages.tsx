@@ -11,6 +11,7 @@ import {
 } from "@cline/ui/components/message-scroller";
 import { Loader2 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { RobotDancer } from "@/components/robot-dancer";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { useIsNormalMode, useStepsExpanded } from "@/lib/app-mode";
 import type {
 	ChatMessage,
 	ChatMessageImage,
@@ -36,6 +38,7 @@ import { STREAMING_TITLE_CLASS } from "./messages/constants";
 import {
 	buildPreviousTimestampMap,
 	buildUserRunCountMap,
+	type ChatRenderItem,
 	collapseCompletedWork,
 	getThoughtDurationMilliseconds,
 	groupChatMessages,
@@ -236,6 +239,8 @@ function ChatMessagesImpl({
 			}),
 		[messages, collapseTrailingRun],
 	);
+	const stepsExpanded = useStepsExpanded();
+	const isNormalMode = useIsNormalMode();
 	const isRunActive =
 		status === "starting" || status === "running" || status === "stopping";
 	const lastUserItemIndex = renderItems.findLastIndex(
@@ -621,6 +626,38 @@ function ChatMessagesImpl({
 											</MessageScrollerItem>
 										);
 									}
+									if (item.type === "run" && !stepsExpanded) {
+										const active = isRunActive && itemIndex > lastUserItemIndex;
+										return (
+											<MessageScrollerItem
+												key={`work_${item.id}`}
+												messageId={`work_${item.id}`}
+											>
+												<WorkBlock
+													defaultOpen={false}
+													// Same key as the finished-run branch below, so an expanded
+													// row stays expanded when the run finishes.
+													key={`work_${item.id}`}
+													live={
+														active
+															? {
+																	startTimestamp: item.startTimestamp,
+																	latestStep: latestStepLabel(item.items),
+																}
+															: undefined
+													}
+													leading={
+														isNormalMode ? (
+															<RobotDancer className="size-[18px]" />
+														) : undefined
+													}
+													toolCallCount={item.toolCallCount}
+												>
+													{item.items.map(renderWorkingRow)}
+												</WorkBlock>
+											</MessageScrollerItem>
+										);
+									}
 									if (item.type === "run") {
 										return (
 											<MessageScrollerItem
@@ -639,6 +676,7 @@ function ChatMessagesImpl({
 												messageId={`work_${item.id}`}
 											>
 												<WorkBlock
+													defaultOpen={stepsExpanded}
 													durationMilliseconds={item.durationMilliseconds}
 													key={`work_${item.id}`}
 													toolCallCount={item.toolCallCount}
@@ -740,7 +778,11 @@ function ChatMessagesImpl({
 											indicatorFollowsWorkingRows && "-mt-3",
 										)}
 									>
-										<Loader2 className="size-4 animate-spin" />
+										{isNormalMode ? (
+											<RobotDancer />
+										) : (
+											<Loader2 className="size-4 animate-spin" />
+										)}
 										<span className={STREAMING_TITLE_CLASS}>
 											{startingLabel ?? activityLabel ?? "Thinking..."}
 										</span>
@@ -928,6 +970,16 @@ function ChatMessagesImpl({
 }
 
 export const ChatMessages = memo(ChatMessagesImpl);
+
+/** Short description of the newest working row, for the live run label. */
+function latestStepLabel(items: ChatRenderItem[]): string | undefined {
+	const last = items.at(-1);
+	if (last?.type === "tools") {
+		const message = last.messages.at(-1);
+		return message ? buildToolPresentation(message).summary.label : undefined;
+	}
+	return last?.type === "message" ? "Thinking" : undefined;
+}
 
 function pruneRequestMap<T extends string>(
 	prev: Record<string, T>,

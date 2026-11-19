@@ -3,6 +3,10 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	APP_MODE_STORAGE_KEY,
+	STEPS_EXPANDED_STORAGE_KEY,
+} from "@/lib/app-mode";
 import type { ChatMessage } from "@/lib/chat-schema";
 import { MAX_LIVE_COMMAND_OUTPUT_CHARS } from "@/lib/command-output";
 import { ChatMessages } from "./chat-messages";
@@ -21,11 +25,17 @@ beforeEach(() => {
 	container = document.createElement("div");
 	document.body.appendChild(container);
 	root = createRoot(container);
+	// Developer mode with steps expanded is the flat-list layout these tests
+	// were written against; the folded layout has its own describe below.
+	window.localStorage.setItem(APP_MODE_STORAGE_KEY, "developer");
+	window.localStorage.removeItem(STEPS_EXPANDED_STORAGE_KEY);
 });
 
 afterEach(async () => {
 	await act(async () => root.unmount());
 	container.remove();
+	window.localStorage.removeItem(APP_MODE_STORAGE_KEY);
+	window.localStorage.removeItem(STEPS_EXPANDED_STORAGE_KEY);
 	vi.restoreAllMocks();
 });
 
@@ -468,6 +478,7 @@ describe("ChatMessages tool disclosures", () => {
 	});
 
 	it("keeps the scheduled-task report visible when the run collapses", async () => {
+		window.localStorage.setItem(STEPS_EXPANDED_STORAGE_KEY, "false");
 		// A follow-up prompt settles the scheduled run's span and folds its
 		// working rows into the work summary; the submit_and_exit row is the
 		// run's final report and must stay visible below it.
@@ -2298,6 +2309,7 @@ describe("ChatMessages work collapse", () => {
 	];
 
 	it("folds a finished run into a work summary that expands back into rows", async () => {
+		window.localStorage.setItem(STEPS_EXPANDED_STORAGE_KEY, "false");
 		await renderMessages(completedRun);
 
 		const trigger = container.querySelector(
@@ -2354,6 +2366,17 @@ describe("ChatMessages thinking indicator", () => {
 				.find((element) => element.textContent === "Thinking...")
 				?.classList.contains("cline-chat-streaming-title"),
 		).toBe(true);
+	});
+
+	it("shows the robot in normal mode and the spinner in developer mode", async () => {
+		await renderMessages([userMessage], { status: "starting" });
+		expect(container.querySelector("svg.robot-dancer")).toBeNull();
+		expect(container.querySelector("svg.animate-spin")).not.toBeNull();
+
+		window.localStorage.removeItem(APP_MODE_STORAGE_KEY);
+		await renderMessages([userMessage], { status: "starting" });
+		expect(container.querySelector("svg.robot-dancer")).not.toBeNull();
+		expect(container.querySelector("svg.animate-spin")).toBeNull();
 	});
 
 	it("keeps showing while running until the first assistant output arrives", async () => {
@@ -2673,5 +2696,158 @@ describe("ChatMessages credential failures", () => {
 		]);
 		await act(async () => buttons[0]?.click());
 		expect(onFixCredentials).toHaveBeenCalledWith("models");
+	});
+});
+
+describe("ChatMessages folded working steps", () => {
+	const user: ChatMessage = {
+		id: "user-1",
+		sessionId: "session-1",
+		role: "user",
+		content: "Check the tax slips",
+		createdAt: 1_000,
+	};
+	const tool = (id: string, createdAt: number): ChatMessage => ({
+		id,
+		sessionId: "session-1",
+		role: "tool",
+		content: JSON.stringify({
+			toolName: "read_files",
+			input: { paths: ["T4 2025.pdf"] },
+			result: {},
+		}),
+		createdAt,
+	});
+	const thinking: ChatMessage = {
+		id: "assistant-1",
+		sessionId: "session-1",
+		role: "assistant",
+		content: "Let me look at the slips.",
+		createdAt: 1_500,
+	};
+	const activeRun = [
+		user,
+		thinking,
+		tool("tool-1", 2_000),
+		tool("tool-2", 3_000),
+	];
+	const trigger = () =>
+		container.querySelector<HTMLButtonElement>(
+			"button.cline-chat-work-trigger",
+		);
+
+	it("folds an active run into one collapsed live row in normal mode", async () => {
+		window.localStorage.removeItem(APP_MODE_STORAGE_KEY);
+		await renderMessages(activeRun, { status: "running" });
+
+		expect(
+			container.querySelectorAll("button.cline-chat-work-trigger"),
+		).toHaveLength(1);
+		const label = trigger()?.textContent ?? "";
+		expect(label).toContain("Working for");
+		expect(label).toContain("2 steps");
+		expect(label).toContain("T4 2025.pdf");
+		expect(trigger()?.getAttribute("aria-expanded")).toBe("false");
+		expect(container.querySelector(".cline-chat-tool")).toBeNull();
+
+		await act(async () => trigger()?.click());
+		expect(trigger()?.getAttribute("aria-expanded")).toBe("true");
+		expect(container.querySelector(".cline-chat-tool")).not.toBeNull();
+	});
+
+	it("shows the robot in the live row only in normal mode", async () => {
+		window.localStorage.removeItem(APP_MODE_STORAGE_KEY);
+		await renderMessages(activeRun, { status: "running" });
+		expect(trigger()?.querySelector("svg.robot-dancer")).not.toBeNull();
+
+		window.localStorage.setItem(APP_MODE_STORAGE_KEY, "developer");
+		window.localStorage.setItem(STEPS_EXPANDED_STORAGE_KEY, "false");
+		await renderMessages(activeRun, { status: "running" });
+		expect(trigger()?.textContent).toContain("Working for");
+		expect(container.querySelector("svg.robot-dancer")).toBeNull();
+	});
+
+	it("folds a run that so far is only back-to-back tool calls", async () => {
+		window.localStorage.removeItem(APP_MODE_STORAGE_KEY);
+		await renderMessages([user, tool("tool-1", 2_000), tool("tool-2", 3_000)], {
+			status: "running",
+		});
+		expect(trigger()?.textContent).toContain("2 steps");
+		expect(container.querySelector(".cline-chat-tool")).toBeNull();
+	});
+
+	it("keeps a row the user expanded open when the run finishes", async () => {
+		window.localStorage.removeItem(APP_MODE_STORAGE_KEY);
+		await renderMessages(activeRun, { status: "running" });
+		await act(async () => trigger()?.click());
+		expect(trigger()?.getAttribute("aria-expanded")).toBe("true");
+
+		const answer: ChatMessage = {
+			id: "assistant-answer",
+			sessionId: "session-1",
+			role: "assistant",
+			content: "Box 14 is 68,450.00.",
+			createdAt: 4_000,
+		};
+		await renderMessages([...activeRun, answer], { status: "completed" });
+		expect(trigger()?.textContent).toContain("Worked for");
+		expect(trigger()?.getAttribute("aria-expanded")).toBe("true");
+		expect(container.textContent).toContain("Box 14 is 68,450.00.");
+	});
+
+	it("keeps the flat run list and opens finished work in developer mode", async () => {
+		await renderMessages(activeRun, { status: "running" });
+		expect(trigger()).toBeNull();
+		expect(container.querySelector(".cline-chat-tool")).not.toBeNull();
+
+		await renderMessages([
+			...activeRun,
+			{ ...thinking, id: "answer", content: "Done.", createdAt: 9_000 },
+		]);
+		expect(trigger()?.getAttribute("aria-expanded")).toBe("true");
+	});
+
+	it("folds like normal mode when developer mode turns the preference off", async () => {
+		window.localStorage.setItem(STEPS_EXPANDED_STORAGE_KEY, "false");
+		await renderMessages(activeRun, { status: "running" });
+		expect(trigger()?.textContent).toContain("Working for");
+		expect(trigger()?.getAttribute("aria-expanded")).toBe("false");
+	});
+
+	it("keeps a pending approval visible while the run is folded", async () => {
+		window.localStorage.removeItem(APP_MODE_STORAGE_KEY);
+		await renderMessages(activeRun, {
+			status: "running",
+			pendingToolApprovals: [
+				{
+					requestId: "req-1",
+					sessionId: "session-1",
+					createdAt: new Date(1).toISOString(),
+					toolCallId: "call-1",
+					toolName: "execute_command",
+					input: { command: "pwd" },
+				},
+			],
+		});
+		expect(trigger()?.getAttribute("aria-expanded")).toBe("false");
+		expect(container.textContent).toContain("pwd");
+	});
+
+	it("keeps a pending question visible while the run is folded", async () => {
+		window.localStorage.removeItem(APP_MODE_STORAGE_KEY);
+		await renderMessages(activeRun, {
+			status: "running",
+			pendingAskQuestions: [
+				{
+					createdAt: "2026-07-31T00:00:00.000Z",
+					options: ["Continue", "Stop"],
+					question: "Continue this task?",
+					requestId: "request-1",
+					sessionId: "session-1",
+				},
+			],
+		});
+		expect(trigger()?.getAttribute("aria-expanded")).toBe("false");
+		expect(container.textContent).toContain("Continue this task?");
 	});
 });

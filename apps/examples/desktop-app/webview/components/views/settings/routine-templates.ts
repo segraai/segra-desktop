@@ -359,9 +359,7 @@ export const DOCUMENT_ROUTINE_TEMPLATES: RoutineTemplate[] = [
 ];
 
 export function routineTemplatesForMode(mode: AppMode): RoutineTemplate[] {
-	return mode === "normal"
-		? DOCUMENT_ROUTINE_TEMPLATES
-		: ROUTINE_TEMPLATES;
+	return mode === "normal" ? DOCUMENT_ROUTINE_TEMPLATES : ROUTINE_TEMPLATES;
 }
 
 export function defaultRoutinePromptForMode(mode: AppMode): string {

@@ -7,7 +7,11 @@ import {
 	APP_FONT_SIZE_STORAGE_KEY,
 	applyAppZoomAction,
 } from "@/lib/app-font-size";
-import { APP_MODE_STORAGE_KEY, readStoredAppMode } from "@/lib/app-mode";
+import {
+	APP_MODE_STORAGE_KEY,
+	readStoredAppMode,
+	readStoredStepsExpanded,
+} from "@/lib/app-mode";
 import { NORMAL_MODE_DIFFERENCES, SettingsView } from "./settings-view";
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
@@ -147,9 +151,23 @@ describe("SettingsView mode", () => {
 		expect(window.localStorage.getItem(APP_MODE_STORAGE_KEY)).toBe("developer");
 		expect(readStoredAppMode()).toBe("developer");
 		expect(modeButton("Developer")?.getAttribute("aria-pressed")).toBe("true");
-		expect(modeButton("Normal")?.getAttribute("aria-pressed")).toBe(
-			"false",
-		);
+		expect(modeButton("Normal")?.getAttribute("aria-pressed")).toBe("false");
+	});
+
+	it("shows the steps toggle only in developer mode and saves it", async () => {
+		await renderGeneral();
+		const toggle = () =>
+			container.querySelector<HTMLInputElement>(
+				'input[aria-label="Show working steps expanded"]',
+			);
+		expect(toggle()).toBeNull();
+		await act(async () => {
+			modeButton("Developer")?.click();
+		});
+		expect(toggle()?.checked).toBe(true);
+		await act(async () => toggle()?.click());
+		expect(readStoredStepsExpanded()).toBe(false);
+		expect(toggle()?.checked).toBe(false);
 	});
 
 	it("lists what normal mode changes when the info icon is clicked", async () => {

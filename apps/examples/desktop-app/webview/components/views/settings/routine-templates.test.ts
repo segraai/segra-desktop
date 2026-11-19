@@ -23,9 +23,7 @@ describe("routineTemplatesForMode", () => {
 	});
 
 	it("returns the document templates in normal mode", () => {
-		expect(routineTemplatesForMode("normal")).toBe(
-			DOCUMENT_ROUTINE_TEMPLATES,
-		);
+		expect(routineTemplatesForMode("normal")).toBe(DOCUMENT_ROUTINE_TEMPLATES);
 		expect(DOCUMENT_ROUTINE_TEMPLATES.map((t) => t.title)).toEqual([
 			"Check for new documents",
 			"List missing documents",

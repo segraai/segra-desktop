@@ -299,9 +299,7 @@ function SettingsSectionNavigation({
 						.filter((section) => collapsed || section !== "Schedules")
 						.map(renderSectionButton)
 				: null}
-			{collapsed &&
-			mode !== "normal" &&
-			customizationSections.length > 0 ? (
+			{collapsed && mode !== "normal" && customizationSections.length > 0 ? (
 				<>
 					<div className="my-2 h-px w-6 shrink-0 bg-sidebar-border" />
 					{customizationSections.map(renderSectionButton)}

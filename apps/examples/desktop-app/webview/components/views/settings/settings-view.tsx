@@ -33,7 +33,13 @@ import {
 	readStoredAppIcon,
 	setStoredAppIcon,
 } from "@/lib/app-icon";
-import { type AppMode, setStoredAppMode, useAppMode } from "@/lib/app-mode";
+import {
+	type AppMode,
+	setStoredAppMode,
+	setStoredStepsExpanded,
+	useAppMode,
+	useStepsExpandedPreference,
+} from "@/lib/app-mode";
 import { desktopClient } from "@/lib/desktop-client";
 import { resetOnboarding } from "@/lib/onboarding";
 import {
@@ -694,6 +700,7 @@ export const NORMAL_MODE_DIFFERENCES: readonly string[] = [
 	'Says "folder" instead of workspace or project, and groups chats by folder.',
 	"Shows starting points on the welcome screen and document checks in Schedules.",
 	"Hides the Import, Remote and Marketplace settings, and the sidebar's source filter.",
+	"Folds each run's working steps into one expandable row.",
 ];
 
 /** Info icon that lists the differences. Opens on hover, focus or click. */
@@ -712,7 +719,12 @@ function AppModeInfo() {
 		cancelClose();
 		closeTimer.current = setTimeout(() => setOpen(false), 150);
 	};
-	useEffect(() => cancelClose, []);
+	useEffect(
+		() => () => {
+			if (closeTimer.current) clearTimeout(closeTimer.current);
+		},
+		[],
+	);
 	return (
 		<Popover onOpenChange={setOpen} open={open}>
 			<PopoverTrigger asChild>
@@ -760,6 +772,7 @@ function GeneralSettingsContent({
 	onExportDiagnostics: () => void;
 }) {
 	const appMode = useAppMode();
+	const stepsExpanded = useStepsExpandedPreference();
 	const [theme, setTheme] = useState<HubTheme>(() => {
 		if (typeof window === "undefined") return "light";
 		return readStoredHubTheme() ?? readSystemHubTheme();
@@ -842,8 +855,8 @@ function GeneralSettingsContent({
 							<AppModeInfo />
 						</div>
 						<p className="text-sm text-muted-foreground">
-							Normal mode hides the coding tools: git branches, pull
-							requests and code diffs.
+							Normal mode hides the coding tools: git branches, pull requests
+							and code diffs.
 						</p>
 					</div>
 					<div className="flex shrink-0 items-center gap-2">
@@ -861,6 +874,23 @@ function GeneralSettingsContent({
 						))}
 					</div>
 				</div>
+				{appMode === "developer" ? (
+					<div className="flex items-center justify-between gap-5 border-b py-4 max-[720px]:flex-col max-[720px]:items-stretch">
+						<div className="flex flex-col gap-1">
+							<p className="text-base font-semibold text-foreground">
+								Show working steps expanded
+							</p>
+							<p className="text-sm text-muted-foreground">
+								Off: each run's steps fold into one row you can expand
+							</p>
+						</div>
+						<Switch
+							aria-label="Show working steps expanded"
+							checked={stepsExpanded}
+							onCheckedChange={setStoredStepsExpanded}
+						/>
+					</div>
+				) : null}
 				<NotificationSettings />
 				<div className="flex py-4 items-center justify-between gap-5 border-b max-[720px]:flex-col max-[720px]:items-stretch max-[720px]:py-4">
 					<div className="flex flex-col gap-1">

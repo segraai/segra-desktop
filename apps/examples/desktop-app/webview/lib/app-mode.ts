@@ -59,3 +59,57 @@ export function useAppMode(): AppMode {
 export function useIsNormalMode(): boolean {
 	return useAppMode() === "normal";
 }
+
+export const STEPS_EXPANDED_STORAGE_KEY = "segra.dev-steps-expanded.v1";
+export const STEPS_EXPANDED_CHANGE_EVENT = "segra-steps-expanded-change";
+
+/** Developer-mode preference: show each run's working steps expanded. */
+export function readStoredStepsExpanded(): boolean {
+	if (typeof window === "undefined") {
+		return true;
+	}
+	try {
+		return window.localStorage.getItem(STEPS_EXPANDED_STORAGE_KEY) !== "false";
+	} catch {
+		return true;
+	}
+}
+
+export function setStoredStepsExpanded(expanded: boolean): void {
+	try {
+		window.localStorage.setItem(STEPS_EXPANDED_STORAGE_KEY, String(expanded));
+	} catch {
+		// The change still applies for this session when persistence fails.
+	}
+	window.dispatchEvent(
+		new CustomEvent<boolean>(STEPS_EXPANDED_CHANGE_EVENT, { detail: expanded }),
+	);
+}
+
+function subscribeToStepsExpanded(onChange: () => void): () => void {
+	window.addEventListener(STEPS_EXPANDED_CHANGE_EVENT, onChange);
+	window.addEventListener("storage", onChange);
+	return () => {
+		window.removeEventListener(STEPS_EXPANDED_CHANGE_EVENT, onChange);
+		window.removeEventListener("storage", onChange);
+	};
+}
+
+function getServerStepsExpanded(): boolean {
+	return true;
+}
+
+export function useStepsExpandedPreference(): boolean {
+	return useSyncExternalStore(
+		subscribeToStepsExpanded,
+		readStoredStepsExpanded,
+		getServerStepsExpanded,
+	);
+}
+
+/** Working steps render expanded only in Developer mode with the preference on. */
+export function useStepsExpanded(): boolean {
+	const mode = useAppMode();
+	const preference = useStepsExpandedPreference();
+	return mode === "developer" && preference;
+}

@@ -1,0 +1,89 @@
+/* ---------- The dancer: an original stick figure with elbows and knees, drawn in the text colour. ---------- */
+.robot-dancer { flex: none; color: currentColor; overflow: visible; }
+.robot-dancer line, .robot-dancer polyline { stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.robot-dancer .skull { fill: currentColor; }
+.robot-dancer g { transform-box: view-box; }
+.robot-dancer .whole { transform-origin: 12px 21.5px; }
+.robot-dancer .torso { transform-origin: 12px 14.5px; }
+.robot-dancer .headg { transform-origin: 12px 7.3px; }
+.robot-dancer .ua { transform-origin: 12px 9px; }
+.robot-dancer .fa { transform-origin: 12px 12px; }
+.robot-dancer .th { transform-origin: 12px 14.5px; }
+.robot-dancer .sh { transform-origin: 12px 18px; }
+.robot-dancer .leg-l .th { transform: rotate(12deg); }
+.robot-dancer .leg-r .th { transform: rotate(-12deg); }
+
+/* Shared robot poses: right angles at shoulder and elbow. */
+@keyframes rb-lua { 0% { transform: rotate(90deg) } 25% { transform: rotate(90deg) } 50% { transform: rotate(0deg) } 75% { transform: rotate(90deg) } 100% { transform: rotate(90deg) } }
+@keyframes rb-lfa { 0% { transform: rotate(-90deg) } 25% { transform: rotate(0deg) } 50% { transform: rotate(90deg) } 75% { transform: rotate(-90deg) } 100% { transform: rotate(-90deg) } }
+@keyframes rb-rua { 0% { transform: rotate(0deg) } 25% { transform: rotate(-90deg) } 50% { transform: rotate(-90deg) } 75% { transform: rotate(-90deg) } 100% { transform: rotate(0deg) } }
+@keyframes rb-rfa { 0% { transform: rotate(-90deg) } 25% { transform: rotate(90deg) } 50% { transform: rotate(0deg) } 75% { transform: rotate(90deg) } 100% { transform: rotate(-90deg) } }
+@keyframes rb-head { 0% { transform: rotate(0) } 25% { transform: rotate(14deg) } 50% { transform: rotate(0) } 75% { transform: rotate(-14deg) } 100% { transform: rotate(0) } }
+@keyframes rb-step { 0% { transform: translateX(0) } 25% { transform: translateX(.8px) } 50% { transform: translateX(0) } 75% { transform: translateX(-.8px) } 100% { transform: translateX(0) } }
+
+/* 1 · Classic: snaps between four poses (the one you picked). */
+.robot-dancer.classic .arm-l .ua { animation: rb-lua 1.6s steps(1,end) infinite; }
+.robot-dancer.classic .arm-l .fa { animation: rb-lfa 1.6s steps(1,end) infinite; }
+.robot-dancer.classic .arm-r .ua { animation: rb-rua 1.6s steps(1,end) infinite; }
+.robot-dancer.classic .arm-r .fa { animation: rb-rfa 1.6s steps(1,end) infinite; }
+.robot-dancer.classic .headg { animation: rb-head 1.6s steps(1,end) infinite; }
+.robot-dancer.classic .whole { animation: rb-step 1.6s steps(1,end) infinite; }
+
+/* 2 · Pop and lock: the same poses, but each move is a fast snap followed by a hold, with a small dip as it locks. */
+.robot-dancer.pop .arm-l .ua { animation: pop-lua 1.6s infinite; }
+.robot-dancer.pop .arm-l .fa { animation: pop-lfa 1.6s infinite; }
+.robot-dancer.pop .arm-r .ua { animation: pop-rua 1.6s infinite; }
+.robot-dancer.pop .arm-r .fa { animation: pop-rfa 1.6s infinite; }
+.robot-dancer.pop .headg { animation: pop-head 1.6s infinite; }
+.robot-dancer.pop .whole { animation: pop-dip .4s cubic-bezier(.2,.8,.2,1) infinite; }
+.robot-dancer.pop .arm-l .ua, .robot-dancer.pop .arm-l .fa, .robot-dancer.pop .arm-r .ua, .robot-dancer.pop .arm-r .fa, .robot-dancer.pop .headg { animation-timing-function: cubic-bezier(.9,0,.1,1); }
+@keyframes pop-lua { 0%,18% { transform: rotate(90deg) } 25%,43% { transform: rotate(90deg) } 50%,68% { transform: rotate(0deg) } 75%,93% { transform: rotate(90deg) } 100% { transform: rotate(90deg) } }
+@keyframes pop-lfa { 0%,18% { transform: rotate(-90deg) } 25%,43% { transform: rotate(0deg) } 50%,68% { transform: rotate(90deg) } 75%,93% { transform: rotate(-90deg) } 100% { transform: rotate(-90deg) } }
+@keyframes pop-rua { 0%,18% { transform: rotate(0deg) } 25%,43% { transform: rotate(-90deg) } 50%,68% { transform: rotate(-90deg) } 75%,93% { transform: rotate(-90deg) } 100% { transform: rotate(0deg) } }
+@keyframes pop-rfa { 0%,18% { transform: rotate(-90deg) } 25%,43% { transform: rotate(90deg) } 50%,68% { transform: rotate(0deg) } 75%,93% { transform: rotate(90deg) } 100% { transform: rotate(-90deg) } }
+@keyframes pop-head { 0%,18% { transform: rotate(0) } 25%,43% { transform: rotate(14deg) } 50%,68% { transform: rotate(0) } 75%,93% { transform: rotate(-14deg) } 100% { transform: rotate(0) } }
+@keyframes pop-dip { 0%,70%,100% { transform: translateY(0) } 80% { transform: translateY(.9px) } }
+
+/* 3 · Robot walk: stiff legs march in place, arms pump at right angles opposite to the legs. */
+.robot-dancer.walk .leg-l .th { animation: walk-lth .8s steps(1,end) infinite; }
+.robot-dancer.walk .leg-r .th { animation: walk-rth .8s steps(1,end) infinite; }
+.robot-dancer.walk .leg-l .sh { animation: walk-lsh .8s steps(1,end) infinite; }
+.robot-dancer.walk .leg-r .sh { animation: walk-rsh .8s steps(1,end) infinite; }
+.robot-dancer.walk .arm-l .ua { animation: walk-lua .8s steps(1,end) infinite; }
+.robot-dancer.walk .arm-r .ua { animation: walk-rua .8s steps(1,end) infinite; }
+.robot-dancer.walk .arm-l .fa { transform: rotate(-90deg); }
+.robot-dancer.walk .arm-r .fa { transform: rotate(90deg); }
+.robot-dancer.walk .whole { animation: walk-bob .4s steps(1,end) infinite; }
+@keyframes walk-lth { 0% { transform: rotate(30deg) } 50% { transform: rotate(6deg) } }
+@keyframes walk-rth { 0% { transform: rotate(-6deg) } 50% { transform: rotate(-30deg) } }
+@keyframes walk-lsh { 0% { transform: rotate(-40deg) } 50% { transform: rotate(0deg) } }
+@keyframes walk-rsh { 0% { transform: rotate(0deg) } 50% { transform: rotate(40deg) } }
+@keyframes walk-lua { 0% { transform: rotate(20deg) } 50% { transform: rotate(60deg) } }
+@keyframes walk-rua { 0% { transform: rotate(-60deg) } 50% { transform: rotate(-20deg) } }
+@keyframes walk-bob { 0% { transform: translateY(0) } 50% { transform: translateY(-.8px) } }
+
+/* 4 · Electric wave: arms held out straight, a bend passes from the left hand through the head to the right hand. */
+.robot-dancer.wave .arm-l .ua { animation: wave-lua 1.4s steps(1,end) infinite; }
+.robot-dancer.wave .arm-l .fa { animation: wave-lfa 1.4s steps(1,end) infinite; }
+.robot-dancer.wave .arm-r .ua { animation: wave-rua 1.4s steps(1,end) infinite; }
+.robot-dancer.wave .arm-r .fa { animation: wave-rfa 1.4s steps(1,end) infinite; }
+.robot-dancer.wave .headg { animation: wave-head 1.4s steps(1,end) infinite; }
+.robot-dancer.wave .torso { animation: wave-torso 1.4s steps(1,end) infinite; }
+@keyframes wave-lfa { 0% { transform: rotate(-60deg) } 14% { transform: rotate(0deg) } 100% { transform: rotate(0deg) } }
+@keyframes wave-lua { 0% { transform: rotate(90deg) } 14% { transform: rotate(115deg) } 28% { transform: rotate(90deg) } 100% { transform: rotate(90deg) } }
+@keyframes wave-head { 0% { transform: rotate(0) } 28% { transform: rotate(-12deg) } 43% { transform: rotate(12deg) } 57% { transform: rotate(0) } 100% { transform: rotate(0) } }
+@keyframes wave-torso { 0% { transform: rotate(0) } 28% { transform: rotate(-4deg) } 43% { transform: rotate(4deg) } 57% { transform: rotate(0) } 100% { transform: rotate(0) } }
+@keyframes wave-rua { 0% { transform: rotate(-90deg) } 57% { transform: rotate(-115deg) } 71% { transform: rotate(-90deg) } 100% { transform: rotate(-90deg) } }
+@keyframes wave-rfa { 0% { transform: rotate(0deg) } 71% { transform: rotate(60deg) } 86% { transform: rotate(0deg) } 100% { transform: rotate(0deg) } }
+
+/* 5 · Slow mime: smooth, slow, mechanical turns, the way a street mime does the robot. */
+.robot-dancer.mime .arm-l .ua { animation: rb-lua 3.2s ease-in-out infinite; }
+.robot-dancer.mime .arm-l .fa { animation: rb-lfa 3.2s ease-in-out infinite; }
+.robot-dancer.mime .arm-r .ua { animation: rb-rua 3.2s ease-in-out infinite; }
+.robot-dancer.mime .arm-r .fa { animation: rb-rfa 3.2s ease-in-out infinite; }
+.robot-dancer.mime .headg { animation: rb-head 3.2s ease-in-out infinite; }
+.robot-dancer.mime .torso { animation: mime-turn 3.2s ease-in-out infinite; }
+@keyframes mime-turn { 0%,100% { transform: rotate(0) } 25% { transform: rotate(4deg) } 75% { transform: rotate(-4deg) } }
+
+@media (prefers-reduced-motion: reduce) { .robot-dancer g { animation: none !important; } }
+

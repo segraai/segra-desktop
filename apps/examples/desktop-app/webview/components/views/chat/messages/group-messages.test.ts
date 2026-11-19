@@ -198,6 +198,8 @@ describe("collapseCompletedWork", () => {
 		if (run?.type !== "run") throw new Error("expected run item");
 		expect(run.id).toBe("r1");
 		expect(run.items.map((item) => item.type)).toEqual(["message", "tools"]);
+		expect(run.toolCallCount).toBe(2);
+		expect(run.startTimestamp).toBe(1_000);
 	});
 
 	it("keeps the live trailing run expanded", () => {
@@ -215,9 +217,10 @@ describe("collapseCompletedWork", () => {
 			false,
 		);
 
+		// Not folded into a work summary: still a live `run` group.
 		expect(items.map((item) => item.type)).toEqual([
 			"message",
-			"tools",
+			"run",
 			"message",
 		]);
 	});
@@ -238,7 +241,7 @@ describe("collapseCompletedWork", () => {
 			true,
 		);
 
-		expect(items.map((item) => item.type)).toEqual(["message", "tools"]);
+		expect(items.map((item) => item.type)).toEqual(["message", "run"]);
 	});
 
 	it("collapses answerless runs once a later user message exists", () => {
@@ -635,7 +638,7 @@ describe("collapseCompletedWork", () => {
 			true,
 		);
 
-		expect(items.map((item) => item.type)).toEqual(["message", "tools"]);
+		expect(items.map((item) => item.type)).toEqual(["message", "run"]);
 	});
 
 	it("measures duration from the first working row when no user message precedes it", () => {

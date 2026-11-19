@@ -28,6 +28,9 @@ export type ChatRenderItem =
 			 */
 			id: string;
 			items: ChatRenderItem[];
+			/** When the run began, for the live "Working for …" label. */
+			startTimestamp?: number;
+			toolCallCount: number;
 	  };
 
 /**
@@ -281,11 +284,17 @@ export function collapseCompletedWork(
 			const body = messageAnswer ? span.slice(0, -1) : span;
 			const firstBody = body[0];
 			const hasToolWork = body.some((item) => item.type === "tools");
-			if (body.length >= 2 && hasToolWork && firstBody !== undefined) {
+			if (hasToolWork && firstBody !== undefined) {
 				out.push({
 					type: "run",
 					id: firstMessageId(firstBody) ?? "run",
 					items: body,
+					startTimestamp: runStartTimestamp ?? firstTimestamp(firstBody),
+					toolCallCount: body.reduce(
+						(count, item) =>
+							item.type === "tools" ? count + item.messages.length : count,
+						0,
+					),
 				});
 				if (messageAnswer) {
 					out.push(messageAnswer);

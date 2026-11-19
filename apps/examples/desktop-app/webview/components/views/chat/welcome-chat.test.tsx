@@ -768,9 +768,7 @@ describe("WelcomeScreen normal mode", () => {
 		});
 		await clickButton("Read a CRA notice");
 		expect(onSelectStarter).toHaveBeenCalledOnce();
-		expect(onSelectStarter.mock.calls[0]?.[0]).toContain(
-			"read_document",
-		);
+		expect(onSelectStarter.mock.calls[0]?.[0]).toContain("read_document");
 		expect(
 			invokeMock.mock.calls.filter(([command]) => /send|start/i.test(command)),
 		).toHaveLength(0);

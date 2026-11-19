@@ -1039,8 +1039,7 @@ export function WelcomeWorkspaceControls({
 	const [cloudDefaultBranch, setCloudDefaultBranch] = useState("");
 	// Normal mode is local-only: no cloud, branch or worktree controls.
 	const normalMode = useIsNormalMode();
-	const showCloud =
-		!normalMode && cloudEnabled && executionTarget === "cloud";
+	const showCloud = !normalMode && cloudEnabled && executionTarget === "cloud";
 	const isChatWorkspace =
 		!workspaceRoot.trim() || isChatWorkspacePath(workspaceRoot);
 	const containerRef = useRef<HTMLDivElement>(null);
